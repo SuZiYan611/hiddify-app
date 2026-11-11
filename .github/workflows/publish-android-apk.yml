@@ -1,0 +1,50 @@
+name: Publish Android APK Link
+on:
+  workflow_dispatch:
+  push:
+    branches: ['private-network']
+    paths: ['.github/workflows/publish-android-apk.yml']
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: publish-private-network-test-20261111
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: private-network-test-20261111
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: SuZiYan611/hiddify-app
+          run-id: '43024185888'
+          name: private-network-android-arm64
+          path: installer
+      - name: Verify installer and prepare release notes
+        run: |
+          cd installer
+          echo '5c4fcee1ef68c64e0a5ade5e61fc584e169cd9b97f5ed4f11a4fd1c2f84cc22e  PrivateNetwork-Android-arm64.apk' | sha256sum --check --strict
+          sha256sum PrivateNetwork-Android-arm64.apk > SHA256SUMS.txt
+          cat > notes.md <<'NOTES'
+          首版 ARM64 Android 测试安装包。使用测试签名，未进行真机及真实 Xray 联网验收。
+          
+          界面采用网页的黑白灰配色、地球连线、登录注册、订阅同步与节点选择。
+          登录页需填写自己的 HTTPS 后台地址；不包含服务器密钥、用户账户或订阅凭据。
+          
+          APK 对应源码：https://github.com/SuZiYan611/hiddify-app/tree/4ce7db34d0d98fd0a4a30ae0139ad27282329d5e
+          基于 Hiddify 改编，保留原始许可和署名。
+          NOTES
+      - name: Create draft and upload verified installer
+        run: |
+          gh release create "$RELEASE_TAG" --repo "$GH_REPO" --target 4ce7db34d0d98fd0a4a30ae0139ad27282329d5e --draft --prerelease --title '私人网络 Android 测试版' --notes-file installer/notes.md
+          gh release upload "$RELEASE_TAG" installer/PrivateNetwork-Android-arm64.apk installer/SHA256SUMS.txt --repo "$GH_REPO"
+      - name: Publish download link
+        run: |
+          gh release edit "$RELEASE_TAG" --repo "$GH_REPO" --draft=false --prerelease
+          gh release view "$RELEASE_TAG" --repo "$GH_REPO" --json url,assets
