@@ -59,9 +59,19 @@ jobs:
       - name: Install Android toolchain
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358'
       - name: Prepare pinned upstream dependencies and generated code
-        env:
-          CHANNEL: prod
-        run: make android-prepare
+        run: |
+          make common-prepare
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/hiddify-android.tar.gz" 'https://github.com/hiddify/hiddify-core/releases/download/draft/hiddify-lib-android.tar.gz'
+          echo "5d7ee5d91824202d8b3b62844291c1a62f17dde3c855d0e8a13081fd234405fb  $RUNNER_TEMP/hiddify-android.tar.gz" | sha256sum --check --strict
+          mkdir -p android/app/libs
+          tar -xzf "$RUNNER_TEMP/hiddify-android.tar.gz" -C android/app/libs
+          # Check the exact native API that the selected application revision requires.
+          aar="$(find android/app/libs -name '*.aar' -print -quit)"
+          test -n "$aar"
+          unzip -p "$aar" classes.jar > "$RUNNER_TEMP/hiddify-core-classes.jar"
+          javap -classpath "$RUNNER_TEMP/hiddify-core-classes.jar" com.hiddify.core.mobile.SetupOptions > "$RUNNER_TEMP/hiddify-setup-api.txt"
+          grep -q 'setMemoryLimit' "$RUNNER_TEMP/hiddify-setup-api.txt"
+          grep -q 'setLowMemory' "$RUNNER_TEMP/hiddify-setup-api.txt"
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Test client API and account lifecycle
