@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/core/theme/theme_extensions.dart';
 
 class PrivateNetworkTheme {
   static ThemeData light() => _build(Brightness.light);
@@ -16,6 +17,7 @@ class PrivateNetworkTheme {
     );
     return ThemeData(
       useMaterial3: true, colorScheme: scheme,
+      extensions: const <ThemeExtension<dynamic>>{ConnectionButtonTheme.light},
       scaffoldBackgroundColor: dark ? const Color(0xff101010) : const Color(0xffefefef),
       appBarTheme: AppBarTheme(backgroundColor: paper, foregroundColor: ink, elevation: 0, scrolledUnderElevation: 0),
       inputDecorationTheme: InputDecorationTheme(
