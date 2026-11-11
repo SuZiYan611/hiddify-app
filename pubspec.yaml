@@ -162,6 +162,8 @@ dependency_overrides:
 flutter:
   uses-material-design: true
   assets:
+    - assets/private_network/land.geojson
+    - assets/private_network/HIDDIFY-LICENSE.md
     # - assets/core/geoip.db
     # - assets/core/geosite.db
     - assets/images/logo.svg

@@ -1,3 +1,4 @@
+import 'package:hiddify/private_network/private_network_home.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/localization/translations.dart';
@@ -68,51 +69,7 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
     }
     if (isMobileBreakpoint == null) return loadingConfig;
     return RoutingConfig(
-      redirect: (context, state) {
-        // fix path-parameters for deep link
-        String? url;
-        if (LinkParser.protocols.contains(state.uri.scheme)) {
-          // Android & iOS deep link
-          url = state.uri.toString();
-        } else if (PlatformUtils.isDesktop && newUrlFromAppLink.isNotEmpty) {
-          // Desktops deep link
-          url = newUrlFromAppLink;
-          newUrlFromAppLink = '';
-        } else if (state.uri.queryParameters['url'] != null) {
-          // Get the configured URL for intro
-          url = state.uri.queryParameters['url'];
-        }
-
-        if (!ref.read(Preferences.introCompleted)) {
-          // Intro is not completed
-          return url != null ? '/intro?url=$url' : '/intro';
-        } else if (state.matchedLocation == '/intro') {
-          // Intro is completed
-          // Current page in '/intro'
-          if (url != null && Uri.parse(url).host == 'import') {
-            WidgetsBinding.instance.addPostFrameCallback(
-              (_) =>
-                  ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(url: url, triggeredByDeepLink: true),
-            );
-          }
-          return '/home';
-        } else if (url != null && Uri.parse(url).host == 'import') {
-          // Auto import profile from url
-          WidgetsBinding.instance.addPostFrameCallback(
-            (_) => ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile(url: url, triggeredByDeepLink: true),
-          );
-          return '/home';
-        } else if (url != null) {
-          final uri = Uri.parse(url);
-          final path = uri.path + (uri.hasQuery ? "?${uri.query}" : "");
-          return path;
-        } else if (state.matchedLocation.contains('chain-options') &&
-            (ref.watch(hasAnyProfileProvider).value == false)) {
-          // Prevent showing chainOptions while hasAnyProfile == false
-          return '/settings';
-        }
-        return null;
-      },
+      redirect: (_, state) => state.matchedLocation == '/intro' ? '/home' : null,
       routes: <RouteBase>[
         StatefulShellRoute.indexedStack(
           builder: (_, _, navigationShell) => MyAdaptiveLayout(
@@ -126,7 +83,7 @@ class RoutingConfigNotifier extends _$RoutingConfigNotifier {
                 GoRoute(
                   name: 'home',
                   path: '/home',
-                  builder: (_, _) => FocusScope(node: branchesScope['home'], child: const HomePage()),
+                  builder: (_, _) => FocusScope(node: branchesScope['home'], child: const PrivateNetworkHome()),
                   routes: <GoRoute>[
                     GoRoute(
                       name: 'proxies',

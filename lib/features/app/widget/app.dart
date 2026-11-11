@@ -1,3 +1,5 @@
+import 'package:hiddify/private_network/portal_gate.dart';
+import 'package:hiddify/private_network/private_network_theme.dart';
 import 'dart:async';
 
 import 'package:accessibility_tools/accessibility_tools.dart';
@@ -61,7 +63,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     final locale = ref.watch(localePreferencesProvider);
     final themeMode = ref.watch(themePreferencesProvider);
     final theme = AppTheme(themeMode, locale.preferredFontFamily);
-    final upgrader = ref.watch(upgraderProvider);
+    const Upgrader? upgrader = null;
     final reduceAnimations = ref.watch(Preferences.reduceAnimations);
     final activeBreakpoint = Breakpoint(context).activeBreakpoint;
 
@@ -69,25 +71,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
     if (PlatformUtils.isAndroid) ref.listen(appBasedRoutingProvider, (_, _) {});
     if (PlatformUtils.isDesktop) ref.listen(systemTrayNotifierProvider, (_, _) {});
 
-    // a crash in the previous run is offered for sending once the first frame is up
-    useEffect(() {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(crashReportNotifierProvider.notifier).checkOnStart();
-      });
-      // outside a store, a new release is offered once a day, a while after the start
-      final updateCheck = Timer(const Duration(seconds: 20), () async {
-        final release = await ref.read(appUpdateNotifierProvider.notifier).checkOnStart();
-        if (release == null) return;
-        await ref
-            .read(dialogNotifierProvider.notifier)
-            .showNewVersion(
-              currentVersion: ref.read(appInfoProvider).requireValue.presentVersion,
-              newVersion: release,
-              canIgnore: true,
-            );
-      });
-      return updateCheck.cancel;
-    }, const []);
+    // Branded builds do not offer upstream binaries or send startup crash reports.
 
     // updating ActiveBreakpointNotifier value
     useEffect(() {
@@ -122,10 +106,11 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                   localizationsDelegates: GlobalMaterialLocalizations.delegates,
                   debugShowCheckedModeBanner: false,
                   themeMode: themeMode.flutterThemeMode,
-                  theme: theme.lightTheme(lightColorScheme),
-                  darkTheme: theme.darkTheme(darkColorScheme),
-                  title: Constants.appName,
+                  theme: PrivateNetworkTheme.light(),
+                  darkTheme: PrivateNetworkTheme.dark(),
+                  title: '私人网络',
                   builder: (context, child) {
+                    child = PortalGate(child: child ?? const SizedBox());
                     final theme = Theme.of(context);
                     // the setting adds to the system's reduce motion, which the animations here follow
                     if (reduceAnimations) {

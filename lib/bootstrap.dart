@@ -61,6 +61,8 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
 
   final appInfo = await _init("app info", () => container.read(appInfoProvider.future));
   await _init("preferences", () => container.read(sharedPreferencesProvider.future));
+  await container.read(Preferences.introCompleted.notifier).update(true);
+  await container.read(Preferences.storeReviewedByUser.notifier).update(true);
   // The ring starts at a safe default and only now learns the size the user
   // picked, since nothing could be read from disk before this point.
   logRing.capacity = container.read(Preferences.logBufferSize);

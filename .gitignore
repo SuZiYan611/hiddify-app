@@ -79,3 +79,10 @@ windows/sign.cer
 /key.pem
 /sign.pfx
 .ci-secrets-export/
+
+# Private Network credentials
+android/key.properties
+*.jks
+*.keystore
+private-network-build.json
+.env

@@ -1,0 +1,131 @@
+name: Private Network Android
+
+on:
+  workflow_dispatch:
+    inputs:
+      signed_release:
+        description: 'Build with the private release signing key (otherwise debug APK)'
+        type: boolean
+        default: false
+  push:
+    branches: ['private-network']
+    paths: ['lib/**', 'test/private_network/**', 'android/**', 'pubspec*', '.github/workflows/private-network-android.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CHANNEL: prod
+      IS_GITHUB_ACTIONS: '1'
+      SIGNED_RELEASE: ${{ inputs.signed_release || false }}
+      # Public address only. Never put server keys, UUIDs or subscription tokens here.
+      PORTAL_ORIGIN: ${{ vars.PORTAL_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify this is a public Hiddify fork
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY" > /tmp/repository.json
+          python3 - <<'PY'
+          import json
+          with open('/tmp/repository.json') as file:
+              repo = json.load(file)
+          if repo.get('private') or not repo.get('fork') or repo.get('source', {}).get('full_name') != 'hiddify/hiddify-app':
+              raise SystemExit('Build this client from your public fork of hiddify/hiddify-app.')
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.5'
+          channel: stable
+          cache: true
+      - uses: android-actions/setup-android@v3
+      - name: Install Android toolchain
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358'
+      - name: Prepare pinned upstream dependencies and generated code
+        run: make android-prepare
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Test client API and account lifecycle
+        run: flutter test test/private_network
+      - name: Write build-time public configuration
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from urllib.parse import urlsplit
+          origin = os.environ.get('PORTAL_ORIGIN', '').strip()
+          if origin:
+              url = urlsplit(origin)
+              if url.scheme != 'https' or not url.hostname or url.username or url.password or url.path not in ('', '/') or url.query or url.fragment:
+                  raise SystemExit('PORTAL_BASE_URL must be an HTTPS origin without credentials or path.')
+          config = {
+              'PORTAL_BASE_URL': origin,
+              'CLIENT_SOURCE_URL': 'https://github.com/' + os.environ['GITHUB_REPOSITORY'] + '/tree/' + os.environ['GITHUB_SHA'],
+          }
+          with open('private-network-build.json', 'w') as file:
+              json.dump(config, file)
+          PY
+      - name: Restore private signing material
+        if: env.SIGNED_RELEASE == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          names = ['KEYSTORE_BASE64', 'STORE_PASSWORD', 'KEY_PASSWORD', 'KEY_ALIAS']
+          if not all(os.environ.get(name) for name in names):
+              raise SystemExit('Release signing secrets are incomplete. No debug-key fallback is allowed for release.')
+          for name in names[1:]:
+              if any(char in os.environ[name] for char in '\r\n'):
+                  raise SystemExit('Signing properties cannot contain newlines.')
+          signing_key = Path(os.environ['RUNNER_TEMP']) / 'private-network.jks'
+          signing_key.write_bytes(base64.b64decode(os.environ['KEYSTORE_BASE64'], validate=True))
+          signing_key.chmod(0o600)
+          def prop(value):
+              return value.replace('\\', '\\\\').replace(':', '\\:').replace('=', '\\=').replace(' ', '\\ ')
+          with open('android/key.properties', 'w') as file:
+              for name, value in [('storeFile', str(signing_key)), ('storePassword', os.environ['STORE_PASSWORD']),
+                  ('keyPassword', os.environ['KEY_PASSWORD']), ('keyAlias', os.environ['KEY_ALIAS'])]:
+                  file.write(name + '=' + prop(value) + '\n')
+          Path('android/key.properties').chmod(0o600)
+          PY
+      - name: Build internal debug APK
+        if: env.SIGNED_RELEASE != 'true'
+        run: flutter build apk --debug --target lib/main_prod.dart --dart-define-from-file=private-network-build.json
+      - name: Build signed release APK
+        if: env.SIGNED_RELEASE == 'true'
+        run: flutter build apk --release --target lib/main_prod.dart --dart-define-from-file=private-network-build.json
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-network-android-${{ env.SIGNED_RELEASE == 'true' && 'release' || 'debug' }}
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove signing material
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          for path in [Path('android/key.properties'), Path(os.environ['RUNNER_TEMP']) / 'private-network.jks']:
+              path.unlink(missing_ok=True)
+          PY

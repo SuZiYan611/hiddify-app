@@ -1,3 +1,11 @@
+# 私人网络 Android 改版
+
+修改日期：2026-11-11。基于 [Hiddify](https://github.com/hiddify/hiddify-app)，原许可见 [LICENSE.md](LICENSE.md)。
+
+改动：账户登录注册、订阅同步、黑白灰界面、地球动画、Android 包名与图标。构建说明见 [PRIVATE_NETWORK.md](PRIVATE_NETWORK.md)。
+
+---
+
 <div dir="ltr" align=center>
     
 [**![Lang_farsi](https://user-images.githubusercontent.com/125398461/234186932-52f1fa82-52c6-417f-8b37-08fe9250a55f.png) فارسی**](README_fa.md) / [**Русский 🇷🇺**](README_ru.md) / [**简体中文 🇨🇳**](README_cn.md) / [**日本語 🇯🇵**](README_ja.md) / [**Portugês-BR 🇧🇷**](README_br.md)
@@ -193,10 +201,3 @@ Hiddify is a community driven project. If you're interested in contributing, ple
 <p align=center>
  Made with <a rel="" target="_blank" href="https://contrib.rocks">Contrib.Rocks</a> 
 </p>
-
-
-
-
-
-
-
