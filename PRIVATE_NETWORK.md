@@ -41,7 +41,13 @@ APK 的后台域名、客户端包名等可以被提取，不能当作秘密或�
 
 ## 当前验证状态
 
-本地源码接入检查 7 项通过，云端 Flutter 分析及账户 API／会话生命周期测试已通过。首次 APK 编译发现稳定引擎与开发版应用的接口不匹配，正在用上游匹配的引擎重新构建。APK 完整打包、界面布局、系统 VPN 授权、后台切换、断线恢复及真实联网仍需验证。
+本地源码接入检查 7 项通过，云端 Flutter 分析及 14 项账户 API／会话生命周期测试通过，Android APK 编译成功。
+
+- [成功的编译记录](https://github.com/SuZiYan611/hiddify-app/actions/runs/43022448232)，APK 对应源码提交 `4ce7db34d0d98fd0a4a30ae0139ad27282329d5e`。
+- [ARM64 测试安装包下载](https://github.com/SuZiYan611/hiddify-app/actions/runs/43024185888/artifacts/13855867903)，下载 ZIP 后解压安装 `PrivateNetwork-Android-arm64.apk`，APK 大小 135377761 bytes。
+- APK SHA-256：`5c4fcee1ef68c64e0a5ade5e61fc584e169cd9b97f5ed4f11a4fd1c2f84cc22e`。
+
+该包使用测试签名，尚未进行真机视觉、系统 VPN 授权、后台切换、断线恢复及真实 Xray 联网验证。正式发布需要配置长期私有签名密钥。后台地址可在登录页填写，服务器和用户凭据未嵌入安装包。
 
 ## 许可
 
