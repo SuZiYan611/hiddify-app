@@ -3,11 +3,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hiddify/private_network/portal_api.dart';
 
-/// Uses the same land data, orthographic projection and city routes as the website.
+/// An interactive globe that plots the locations returned by the account API.
 class NetworkGlobe extends StatefulWidget {
-  const NetworkGlobe({super.key, this.connected = false});
-  final bool connected;
+  const NetworkGlobe({super.key, this.nodes = const [], this.onNodeSelected});
+  final List<PortalNode> nodes;
+  final ValueChanged<int>? onNodeSelected;
+
   @override
   State<NetworkGlobe> createState() => _NetworkGlobeState();
 }
@@ -16,6 +19,11 @@ class _NetworkGlobeState extends State<NetworkGlobe> with SingleTickerProviderSt
   late final AnimationController _rotation = AnimationController(vsync: this, duration: const Duration(seconds: 120));
   static Future<List<List<List<double>>>>? _cachedLand;
   late final Future<List<List<List<double>>>> _land = _cachedLand ??= _loadLand();
+  double _manualRotation = 0;
+  double _tilt = 0;
+  double _zoom = 1;
+  double _gestureZoom = 1;
+  int? _selectedNode;
 
   static Future<List<List<List<double>>>> _loadLand() async {
     final data = jsonDecode(await rootBundle.loadString('assets/private_network/land.geojson')) as Map<String, dynamic>;
@@ -43,97 +51,260 @@ class _NetworkGlobeState extends State<NetworkGlobe> with SingleTickerProviderSt
   }
 
   @override
-  void dispose() { _rotation.dispose(); super.dispose(); }
+  void dispose() {
+    _rotation.dispose();
+    super.dispose();
+  }
+
+  void _pickNode(Offset point, Size size, double progress) {
+    final center = size.center(Offset.zero);
+    final radius = size.shortestSide * .405 * _zoom;
+    final autoDegrees = progress * 360 - 100 + _manualRotation;
+    final yaw = autoDegrees * math.pi / 180;
+    final cosYaw = math.cos(yaw);
+    final sinYaw = math.sin(yaw);
+    final cosTilt = math.cos(_tilt);
+    final sinTilt = math.sin(_tilt);
+    final markers = <(int, Offset, double)>[];
+    for (var index = 0; index < widget.nodes.length; index++) {
+      final node = widget.nodes[index];
+      if (node.longitude == null || node.latitude == null) continue;
+      final longitude = node.longitude! * math.pi / 180;
+      final latitude = node.latitude! * math.pi / 180;
+      final x = math.cos(latitude) * math.sin(longitude);
+      final y = math.sin(latitude);
+      final z = math.cos(latitude) * math.cos(longitude);
+      final rotatedX = x * cosYaw + z * sinYaw;
+      final rotatedZ = z * cosYaw - x * sinYaw;
+      final projectedY = y * cosTilt - rotatedZ * sinTilt;
+      final depth = y * sinTilt + rotatedZ * cosTilt;
+      if (depth > 0) {
+        final stackOffset = (index - (widget.nodes.length - 1) / 2) * 16.0;
+        final position = center + Offset(rotatedX * radius + stackOffset, -projectedY * radius);
+        markers.add((index, position, depth));
+      }
+    }
+    for (final marker in markers.reversed) {
+      if ((point - marker.$2).distance <= 26) {
+        setState(() => _selectedNode = marker.$1);
+        widget.onNodeSelected?.call(marker.$1);
+        return;
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Semantics(
-    label: '地球与城市间的网络连线', image: true,
-    child: RepaintBoundary(child: AspectRatio(aspectRatio: 1, child: FutureBuilder<List<List<List<double>>>>(
-      future: _land,
-      builder: (context, snapshot) => AnimatedBuilder(
-        animation: _rotation,
-        builder: (context, _) => CustomPaint(painter: _GlobePainter(
-          _rotation.value, snapshot.data ?? const [], Theme.of(context).brightness == Brightness.dark, widget.connected,
-        )),
+    label: '可拖动和缩放的地球节点地图',
+    image: true,
+    child: RepaintBoundary(
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: FutureBuilder<List<List<List<double>>>>(
+          future: _land,
+          builder: (context, snapshot) => AnimatedBuilder(
+            animation: _rotation,
+            builder: (context, _) => LayoutBuilder(
+              builder: (context, constraints) {
+                final size = Size(constraints.maxWidth, constraints.maxHeight);
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onScaleStart: (_) {
+                    _gestureZoom = _zoom;
+                    _rotation.stop();
+                  },
+                  onScaleUpdate: (details) => setState(() {
+                    if (details.pointerCount > 1) {
+                      _zoom = (_gestureZoom * details.scale).clamp(.72, 1.6);
+                    } else {
+                      _manualRotation += details.focalPointDelta.dx / size.shortestSide * 360;
+                      _tilt = (_tilt - details.focalPointDelta.dy / size.shortestSide * math.pi).clamp(-1.15, 1.15);
+                    }
+                  }),
+                  onTapUp: (details) => _pickNode(details.localPosition, size, _rotation.value),
+                  child: CustomPaint(
+                    painter: _GlobePainter(
+                      progress: _rotation.value,
+                      land: snapshot.data ?? const [],
+                      dark: Theme.of(context).brightness == Brightness.dark,
+                      nodes: widget.nodes,
+                      selectedNode: _selectedNode,
+                      rotation: _manualRotation,
+                      tilt: _tilt,
+                      zoom: _zoom,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
       ),
-    ))),
+    ),
   );
 }
 
 class _GlobePainter extends CustomPainter {
-  _GlobePainter(this.progress, this.land, this.dark, this.connected);
+  _GlobePainter({
+    required this.progress,
+    required this.land,
+    required this.dark,
+    required this.nodes,
+    required this.selectedNode,
+    required this.rotation,
+    required this.tilt,
+    required this.zoom,
+  });
   final double progress;
   final List<List<List<double>>> land;
   final bool dark;
-  final bool connected;
-  static const cities = <(double, double)>[
-    (101.69, 3.14), (103.82, 1.35), (114.17, 22.32), (121.57, 25.03),
-    (139.69, 35.68), (126.98, 37.57), (151.21, -33.87), (-0.13, 51.51),
-    (2.35, 48.86), (-74.01, 40.71), (-118.24, 34.05),
-  ];
-  static const routes = [(0, 1), (0, 2), (1, 3), (2, 4), (3, 5), (1, 6), (7, 8), (7, 9), (9, 10)];
-
+  final List<PortalNode> nodes;
+  final int? selectedNode;
+  final double rotation;
+  final double tilt;
+  final double zoom;
   @override
   void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
     final center = size.center(Offset.zero);
-    final radius = size.shortestSide * .405;
-    final rotation = progress * 360 - 100;
+    final radius = size.shortestSide * .405 * zoom;
+    final yaw = (progress * 360 - 100 + rotation) * math.pi / 180;
+    final cosYaw = math.cos(yaw);
+    final sinYaw = math.sin(yaw);
+    final cosTilt = math.cos(tilt);
+    final sinTilt = math.sin(tilt);
     (Offset, double) project(double longitude, double latitude) {
-      final lon = (longitude + rotation) * math.pi / 180;
+      final lon = longitude * math.pi / 180;
       final lat = latitude * math.pi / 180;
-      return (center + Offset(radius * math.cos(lat) * math.sin(lon), -radius * math.sin(lat)), math.cos(lat) * math.cos(lon));
+      final x = math.cos(lat) * math.sin(lon);
+      final y = math.sin(lat);
+      final z = math.cos(lat) * math.cos(lon);
+      final rotatedX = x * cosYaw + z * sinYaw;
+      final rotatedZ = z * cosYaw - x * sinYaw;
+      final projectedY = y * cosTilt - rotatedZ * sinTilt;
+      final depth = y * sinTilt + rotatedZ * cosTilt;
+      return (center + Offset(radius * rotatedX, -radius * projectedY), depth);
     }
-    final outline = Paint()..color = dark ? const Color(0xff555555) : const Color(0xffcccccc)
-      ..style = PaintingStyle.stroke..strokeWidth = 1;
+
+    final outline = Paint()
+      ..color = dark ? const Color(0xff555555) : const Color(0xffcccccc)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
     final globePath = Path()..addOval(Rect.fromCircle(center: center, radius: radius));
     canvas.drawCircle(center, radius, Paint()..color = dark ? const Color(0xff202020) : const Color(0xfff7f7f7));
     canvas.save();
     canvas.clipPath(globePath);
     final fill = Paint()..color = dark ? const Color(0xff484848) : const Color(0xffbfc2c3);
     for (final ring in land) {
-      final points = ring.map((point) => project(point[0], point[1])).toList();
+      final vertexCount = ring.length - 1;
+      if (vertexCount < 3) continue;
+      final points = List.generate(vertexCount, (index) => project(ring[index][0], ring[index][1]));
       if (!points.any((point) => point.$2 > 0)) continue;
-      final path = Path();
-      for (var index = 0; index < points.length; index++) {
-        var point = points[index].$1;
-        if (points[index].$2 < 0) {
-          final delta = point - center;
-          point = center + delta / (delta.distance == 0 ? 1 : delta.distance) * radius;
+      if (points.every((point) => point.$2 > 0)) {
+        final path = Path()..moveTo(points.first.$1.dx, points.first.$1.dy);
+        for (final point in points.skip(1)) {
+          path.lineTo(point.$1.dx, point.$1.dy);
         }
-        if (index == 0) { path.moveTo(point.dx, point.dy); } else { path.lineTo(point.dx, point.dy); }
+        canvas.drawPath(path..close(), fill);
+        continue;
       }
-      canvas.drawPath(path..close(), fill);
+      final start = points.indexWhere((point) => point.$2 <= 0);
+      final visibleSegment = <Offset>[];
+      void drawVisibleSegment() {
+        if (visibleSegment.length >= 3) {
+          final path = Path()..moveTo(visibleSegment.first.dx, visibleSegment.first.dy);
+          for (final point in visibleSegment.skip(1)) {
+            path.lineTo(point.dx, point.dy);
+          }
+          canvas.drawPath(path..close(), fill);
+        }
+        visibleSegment.clear();
+      }
+
+      Offset horizonPoint(int index, int nextIndex, bool currentIsVisible) {
+        var low = 0.0;
+        var high = 1.0;
+        final current = ring[index];
+        final next = ring[nextIndex];
+        for (var step = 0; step < 16; step++) {
+          final fraction = (low + high) / 2;
+          final longitude = current[0] + (next[0] - current[0]) * fraction;
+          final latitude = current[1] + (next[1] - current[1]) * fraction;
+          if ((project(longitude, latitude).$2 > 0) == currentIsVisible) {
+            low = fraction;
+          } else {
+            high = fraction;
+          }
+        }
+        final fraction = (low + high) / 2;
+        final longitude = current[0] + (next[0] - current[0]) * fraction;
+        final latitude = current[1] + (next[1] - current[1]) * fraction;
+        return project(longitude, latitude).$1;
+      }
+
+      // Begin on the hidden side so every visible run is a separate clipped
+      // polygon instead of connecting distant far-side vertices across land.
+      for (var step = 0; step < vertexCount; step++) {
+        final index = (start + step) % vertexCount;
+        final nextIndex = (index + 1) % vertexCount;
+        final currentVisible = points[index].$2 > 0;
+        final nextVisible = points[nextIndex].$2 > 0;
+        if (currentVisible && nextVisible) {
+          if (visibleSegment.isEmpty) visibleSegment.add(points[index].$1);
+          visibleSegment.add(points[nextIndex].$1);
+        } else if (currentVisible && !nextVisible) {
+          if (visibleSegment.isEmpty) visibleSegment.add(points[index].$1);
+          visibleSegment.add(horizonPoint(index, index + 1, true));
+          drawVisibleSegment();
+        } else if (!currentVisible && nextVisible) {
+          visibleSegment
+            ..add(horizonPoint(index, index + 1, false))
+            ..add(points[nextIndex].$1);
+        }
+      }
+      drawVisibleSegment();
     }
     canvas.restore();
     canvas.drawCircle(center, radius, outline);
-    final routePaint = Paint()..color = dark ? const Color(0xffaaaaaa) : const Color(0xff777777)
-      ..style = PaintingStyle.stroke..strokeWidth = 1;
-    final dotPaint = Paint()..color = dark ? Colors.white : const Color(0xff333333);
-    for (var index = 0; index < routes.length; index++) {
-      final route = routes[index];
-      final start = project(cities[route.$1].$1, cities[route.$1].$2);
-      final end = project(cities[route.$2].$1, cities[route.$2].$2);
-      if (start.$2 < .1 || end.$2 < .1) continue;
-      final middle = (start.$1 + end.$1) / 2 - Offset(0, math.min(radius * .25, (start.$1 - end.$1).distance * .25));
-      final path = Path()..moveTo(start.$1.dx, start.$1.dy)
-        ..quadraticBezierTo(middle.dx, middle.dy, end.$1.dx, end.$1.dy);
-      for (final metric in path.computeMetrics()) {
-        for (var distance = 0.0; distance < metric.length; distance += 7) {
-          canvas.drawPath(metric.extractPath(distance, math.min(distance + 3, metric.length)), routePaint);
-        }
-        final tangent = metric.getTangentForOffset(metric.length * ((progress * 24 + index / routes.length) % 1));
-        if (tangent != null) {
-          canvas.save(); canvas.translate(tangent.position.dx, tangent.position.dy); canvas.rotate(tangent.angle);
-          canvas.drawPath(Path()..moveTo(5, 0)..lineTo(-3, -3)..lineTo(-1, 0)..lineTo(-3, 3)..close(), dotPaint);
-          canvas.restore();
-        }
+    for (var index = 0; index < nodes.length; index++) {
+      final node = nodes[index];
+      if (node.longitude == null || node.latitude == null) continue;
+      final point = project(node.longitude!, node.latitude!);
+      if (point.$2 <= .04) continue;
+      final position = point.$1 + Offset((index - (nodes.length - 1) / 2) * 16.0, 0);
+      final selected = selectedNode == index;
+      canvas.drawCircle(position, selected ? 10 : 7, Paint()..color = dark ? Colors.white : Colors.black);
+      canvas.drawCircle(position, selected ? 5 : 3, Paint()..color = dark ? Colors.black : Colors.white);
+      if (selected) {
+        final text = TextPainter(
+          text: TextSpan(
+            text: node.name,
+            style: TextStyle(color: dark ? Colors.black : Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+          textDirection: TextDirection.ltr,
+          maxLines: 1,
+          ellipsis: '…',
+        )..layout(maxWidth: size.width * .55);
+        final rect = RRect.fromRectAndRadius(
+          Rect.fromLTWH(position.dx - text.width / 2 - 9, position.dy - 34, text.width + 18, text.height + 8),
+          const Radius.circular(12),
+        );
+        canvas.drawRRect(rect, Paint()..color = dark ? Colors.white : Colors.black);
+        text.paint(canvas, Offset(rect.left + 9, rect.top + 4));
       }
-      canvas.drawCircle(start.$1, connected ? 2.5 : 2, dotPaint);
-      canvas.drawCircle(end.$1, connected ? 2.5 : 2, dotPaint);
     }
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant _GlobePainter old) => progress != old.progress ||
-    land != old.land || dark != old.dark || connected != old.connected;
+  bool shouldRepaint(covariant _GlobePainter old) =>
+      progress != old.progress ||
+      land != old.land ||
+      dark != old.dark ||
+      nodes != old.nodes ||
+      selectedNode != old.selectedNode ||
+      rotation != old.rotation ||
+      tilt != old.tilt ||
+      zoom != old.zoom;
 }

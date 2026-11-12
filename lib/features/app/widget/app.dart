@@ -108,7 +108,7 @@ class App extends HookConsumerWidget with WidgetsBindingObserver, PresLogger {
                   themeMode: themeMode.flutterThemeMode,
                   theme: PrivateNetworkTheme.light(),
                   darkTheme: PrivateNetworkTheme.dark(),
-                  title: '私人网络',
+                  title: 'GBM',
                   builder: (context, child) {
                     child = PortalGate(child: child ?? const SizedBox());
                     final theme = Theme.of(context);

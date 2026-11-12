@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/connection/data/connection_data_providers.dart';
@@ -11,11 +12,16 @@ import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/private_network/portal_api.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-final portalSessionProvider = ChangeNotifierProvider<PortalSession>((ref) => PortalSession(
-  gateway: HiddifyPortalGateway(ref),
-  readOrigin: () => ref.read(sharedPreferencesProvider).requireValue.getString('private_network_origin'),
-  saveOrigin: (value) async { await ref.read(sharedPreferencesProvider).requireValue.setString('private_network_origin', value); },
-));
+final portalSessionProvider = ChangeNotifierProvider<PortalSession>(
+  (ref) => PortalSession(
+    gateway: HiddifyPortalGateway(ref),
+    readOrigin: () => ref.read(sharedPreferencesProvider).requireValue.getString('private_network_origin'),
+    saveOrigin: (value) async {
+      await ref.read(sharedPreferencesProvider).requireValue.setString('private_network_origin', value);
+    },
+    secureStorage: const FlutterSecureStorage(),
+  ),
+);
 
 abstract interface class PortalGateway {
   Future<void> stopTunnel();
@@ -23,18 +29,23 @@ abstract interface class PortalGateway {
   Future<void> sync(Uri subscription);
 }
 
-/// V1 deliberately keeps the login token in memory only, never preferences or SQLite.
-/// A cold start requires login again. The VPN/profile cache is cleared before sign-in.
 class PortalSession extends ChangeNotifier {
-  PortalSession({required this.gateway, required this.readOrigin, required this.saveOrigin,
-    this.apiFactory = PortalApi.new, bool autoInitialize = true}) {
+  PortalSession({
+    required this.gateway,
+    required this.readOrigin,
+    required this.saveOrigin,
+    this.secureStorage = const FlutterSecureStorage(),
+    this.apiFactory = PortalApi.new,
+    bool autoInitialize = true,
+  }) {
     if (autoInitialize) scheduleMicrotask(initialize);
   }
   final PortalGateway gateway;
   final String? Function() readOrigin;
   final Future<void> Function(String) saveOrigin;
+  final FlutterSecureStorage secureStorage;
   final PortalApi Function(String) apiFactory;
-  static const profileName = '私人网络 · 账户订阅';
+  static const profileName = 'GBM · 账户订阅';
   PortalApi? _api;
   String? _token;
   PortalAccount? account;
@@ -45,15 +56,37 @@ class PortalSession extends ChangeNotifier {
   bool profileReady = false;
   bool _disposed = false;
 
-  void _changed() { if (!_disposed) notifyListeners(); }
+  void _changed() {
+    if (!_disposed) notifyListeners();
+  }
 
   Future<void> initialize() async {
     if (!busy) busy = true;
     message = null;
     _changed();
     try {
-      await _clearProfiles();
+      final savedOrigin = readOrigin();
+      if (savedOrigin != null && savedOrigin.isNotEmpty) endpoint = savedOrigin;
+      final savedToken = await secureStorage.read(key: 'gbm_session_token');
+      if (savedToken != null && savedToken.isNotEmpty) {
+        final api = apiFactory(endpoint);
+        _api?.close();
+        _api = api;
+        _token = savedToken;
+        account = await api.me(savedToken);
+        await _syncProfile();
+      } else {
+        await _clearProfiles();
+      }
       ready = true;
+    } on PortalFailure catch (error) {
+      await secureStorage.delete(key: 'gbm_session_token');
+      await _clearProfiles();
+      account = null;
+      _token = null;
+      _api?.close();
+      _api = null;
+      message = error.message;
     } catch (_) {
       message = '无法清理上次的连接，请重试后再登录。';
     } finally {
@@ -71,8 +104,12 @@ class PortalSession extends ChangeNotifier {
     profileReady = false;
   }
 
-  Future<void> authenticate({required String origin, required String email,
-    required String password, String? confirmation}) async {
+  Future<void> authenticate({
+    required String origin,
+    required String email,
+    required String password,
+    String? confirmation,
+  }) async {
     if (busy || !ready || account != null) return;
     busy = true;
     message = null;
@@ -85,6 +122,7 @@ class PortalSession extends ChangeNotifier {
       await saveOrigin(endpoint);
       if (confirmation != null) await api.register(email, password, confirmation);
       _token = await api.login(email, password);
+      await secureStorage.write(key: 'gbm_session_token', value: _token);
       account = await api.me(_token!);
       await _syncProfile();
     } on PortalFailure catch (error) {
@@ -102,6 +140,10 @@ class PortalSession extends ChangeNotifier {
     final user = account;
     if (user == null) return;
     profileReady = false;
+    if (user.remainingDays == 0) {
+      await gateway.clearProfiles();
+      return;
+    }
     await gateway.sync(user.subscription);
     profileReady = true;
   }
@@ -142,10 +184,15 @@ class PortalSession extends ChangeNotifier {
       await _clearProfiles();
       var revoked = true;
       if (_api != null && _token != null) {
-        try { await _api!.logout(_token!); } catch (_) { revoked = false; }
+        try {
+          await _api!.logout(_token!);
+        } catch (_) {
+          revoked = false;
+        }
       }
       account = null;
       _token = null;
+      await secureStorage.delete(key: 'gbm_session_token');
       _api?.close();
       _api = null;
       if (!revoked) message = '已在本机退出；后台暂时无法访问，服务器会话尚未撤销。';
@@ -177,34 +224,42 @@ class HiddifyPortalGateway implements PortalGateway {
     await ref.read(Preferences.startedByUser.notifier).update(false);
     await ref.read(connectionNotifierProvider.notifier).abortConnection();
     final repository = ref.read(connectionRepositoryProvider);
-    await repository.disconnect()
-      .getOrElse((_) => throw const PortalFailure('未能断开 VPN，尚未退出，请重试。')).run();
-    await repository.watchConnectionStatus().firstWhere((state) => state is Disconnected)
-      .timeout(const Duration(seconds: 15));
+    await repository.disconnect().getOrElse((_) => throw const PortalFailure('未能断开 VPN，尚未退出，请重试。')).run();
+    await repository
+        .watchConnectionStatus()
+        .firstWhere((state) => state is Disconnected)
+        .timeout(const Duration(seconds: 15));
   }
 
   @override
   Future<void> clearProfiles() async {
     await stopTunnel();
     final repository = await ref.read(profileRepositoryProvider.future);
-    final profiles = await repository.watchAll().first.then((value) => value.getOrElse((_) =>
-      throw const PortalFailure('无法读取设备上的订阅配置。')));
+    final profiles = await repository.watchAll().first.then(
+      (value) => value.getOrElse((_) => throw const PortalFailure('无法读取设备上的订阅配置。')),
+    );
     for (final profile in profiles) {
-      await repository.deleteById(profile.id, profile.active)
-        .getOrElse((_) => throw const PortalFailure('无法清理设备上的订阅配置。')).run();
+      await repository
+          .deleteById(profile.id, profile.active)
+          .getOrElse((_) => throw const PortalFailure('无法清理设备上的订阅配置。'))
+          .run();
     }
   }
 
   @override
   Future<void> sync(Uri subscription) async {
     final repository = await ref.read(profileRepositoryProvider.future);
-    await repository.upsertRemote(subscription.toString(), userOverride: const UserOverride(name: PortalSession.profileName))
-      .getOrElse((_) => throw const PortalFailure('无法导入订阅，请检查后台节点配置后重试。')).run();
-    final profiles = await repository.watchAll().first.then((value) => value.getOrElse((_) =>
-      throw const PortalFailure('无法读取订阅。')));
-    final matches = profiles.whereType<RemoteProfileEntity>().where((profile) => profile.url == subscription.toString());
+    await repository
+        .upsertRemote(subscription.toString(), userOverride: const UserOverride(name: PortalSession.profileName))
+        .getOrElse((_) => throw const PortalFailure('无法导入订阅，请检查后台节点配置后重试。'))
+        .run();
+    final profiles = await repository.watchAll().first.then(
+      (value) => value.getOrElse((_) => throw const PortalFailure('无法读取订阅。')),
+    );
+    final matches = profiles.whereType<RemoteProfileEntity>().where(
+      (profile) => profile.url == subscription.toString(),
+    );
     if (matches.length != 1) throw const PortalFailure('没有找到唯一的账户订阅。');
-    await repository.setAsActive(matches.single.id)
-      .getOrElse((_) => throw const PortalFailure('无法启用账户订阅。')).run();
+    await repository.setAsActive(matches.single.id).getOrElse((_) => throw const PortalFailure('无法启用账户订阅。')).run();
   }
 }
