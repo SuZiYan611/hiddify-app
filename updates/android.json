@@ -1,19 +1,19 @@
 {
-  "body": "地球手势修复测试版。debug 签名。",
+  "body": "地球节点点击与缩放、启动自动检查更新测试版。debug 签名；未验证真实 VPN 联网或应用内自动安装升级。",
   "assets": [
     {
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test2/GBM-Android-arm64-debug.apk",
       "name": "GBM-Android-arm64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test3/GBM-Android-arm64-debug.apk",
       "state": "uploaded"
     },
     {
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test2/GBM-Android-x86_64-debug.apk",
       "name": "GBM-Android-x86_64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test3/GBM-Android-x86_64-debug.apk",
       "state": "uploaded"
     }
   ],
-  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test2",
+  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test3",
   "prerelease": true,
-  "tag_name": "private-network-v0.1.0-test2",
+  "tag_name": "private-network-v0.1.0-test3",
   "draft": false
 }
