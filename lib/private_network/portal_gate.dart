@@ -34,21 +34,19 @@ class _PortalSignInPageState extends ConsumerState<PortalSignInPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _confirmation = TextEditingController();
-  final _server = TextEditingController();
   bool _register = false;
   bool _obscure = true;
-  bool _serverInitialized = false;
 
   @override
   void dispose() {
-    _email.dispose(); _password.dispose(); _confirmation.dispose(); _server.dispose(); super.dispose();
+    _email.dispose(); _password.dispose(); _confirmation.dispose(); super.dispose();
   }
 
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
     final session = ref.read(portalSessionProvider);
-    await session.authenticate(origin: _server.text, email: _email.text,
+    await session.authenticate(origin: session.endpoint, email: _email.text,
       password: _password.text, confirmation: _register ? _confirmation.text : null);
     if (mounted && session.account != null) {
       _password.clear(); _confirmation.clear();
@@ -58,10 +56,6 @@ class _PortalSignInPageState extends ConsumerState<PortalSignInPage> {
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(portalSessionProvider);
-    if (!_serverInitialized && !session.busy) {
-      _server.text = session.endpoint;
-      _serverInitialized = true;
-    }
     final theme = Theme.of(context);
     final card = Container(
       width: 420,
@@ -113,14 +107,6 @@ class _PortalSignInPageState extends ConsumerState<PortalSignInPage> {
               validator: (value) => value == _password.text ? null : '两次输入的密码不一致',
               onFieldSubmitted: (_) { if (!session.busy) _submit(); }),
           ],
-          const SizedBox(height: 14),
-          ExpansionTile(tilePadding: EdgeInsets.zero, title: const Text('服务器地址', style: TextStyle(fontSize: 13)),
-            initiallyExpanded: session.endpoint.isEmpty,
-            children: [Padding(padding: const EdgeInsets.only(bottom: 16), child: TextFormField(
-              controller: _server, enabled: !session.busy, autocorrect: false, enableSuggestions: false,
-              decoration: const InputDecoration(hintText: 'https://vpn.example.com'), keyboardType: TextInputType.url,
-              validator: (value) => value != null && value.trim().startsWith('https://') ? null : '请输入 HTTPS 后台地址',
-            ))]),
           const SizedBox(height: 14),
           FilledButton(onPressed: session.busy ? null : _submit,
             child: session.busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))

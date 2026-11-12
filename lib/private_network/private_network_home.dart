@@ -87,7 +87,8 @@ class _PrivateNetworkHomeState extends ConsumerState<PrivateNetworkHome> {
                 TextButton(onPressed: session.busy ? null : () => showModalBottomSheet<void>(context: context,
                   isScrollControlled: true, useSafeArea: true, builder: (_) => const PortalNodesSheet()), child: const Text('选择节点'))]),
               const SizedBox(height: 10),
-              Text(running && proxy != null && proxy.tag.isNotEmpty ? proxy.name : '连接后查看当前节点',
+              Text(running && proxy != null && proxy.tag.isNotEmpty ? proxy.name
+                : session.profileReady ? '已导入 ${session.account?.nodeNames.length ?? 0} 个账户节点' : '账户节点尚未就绪',
                 style: const TextStyle(fontWeight: FontWeight.w500)),
               const SizedBox(height: 6),
               Text(running && proxy != null && proxy.urlTestDelay > 0 && proxy.urlTestDelay < 65000

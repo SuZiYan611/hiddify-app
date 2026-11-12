@@ -30,10 +30,11 @@ Uri validateSubscription(Uri origin, String value) {
 }
 
 class PortalAccount {
-  const PortalAccount({required this.email, required this.subscription, required this.notice});
+  const PortalAccount({required this.email, required this.subscription, required this.notice, this.nodeNames = const []});
   final String email;
   final Uri subscription;
   final String? notice;
+  final List<String> nodeNames;
 
   factory PortalAccount.fromJson(Map<String, dynamic> json, Uri origin) {
     final subscription = json['subscription'];
@@ -43,10 +44,16 @@ class PortalAccount {
       throw const PortalFailure('后台账户数据格式不正确。');
     }
     final notice = json['prototype_notice'];
+    final rawNodes = json['nodes'];
+    if (rawNodes != null && (rawNodes is! List || rawNodes.any((node) =>
+        node is! Map || node['name'] is! String || (node['name'] as String).trim().isEmpty))) {
+      throw const PortalFailure('后台节点数据格式不正确。');
+    }
     return PortalAccount(
       email: email,
       subscription: validateSubscription(origin, subscription['subscription_url'] as String),
       notice: notice is String && notice.trim().isNotEmpty ? notice : null,
+      nodeNames: List.unmodifiable((rawNodes as List? ?? []).map((node) => ((node as Map)['name'] as String).trim())),
     );
   }
 
@@ -86,6 +93,12 @@ class PortalApi {
       return response.data as Map<String, dynamic>;
     } on DioException catch (error) {
       final status = error.response?.statusCode;
+      if (status == 429) {
+        throw const PortalFailure('操作过于频繁，请稍后重试。');
+      }
+      if (status == 400 && path == '/api/register') {
+        throw const PortalFailure('注册未完成：请确认邮箱已获邀请，且账户信息符合要求。');
+      }
       if (status == 401 || status == 403) {
         throw PortalFailure(path == '/api/login' ? '邮箱或密码错误。' : '登录已失效，请重新登录。',
           unauthorized: path != '/api/login');
@@ -96,7 +109,7 @@ class PortalApi {
       if (status != null && status >= 300 && status < 400) {
         throw const PortalFailure('后台地址发生跳转，请填写最终的 HTTPS 地址。');
       }
-      throw const PortalFailure('暂时无法访问后台，请检查网络和服务器地址后重试。');
+      throw const PortalFailure('暂时无法访问账户服务，请检查网络后重试。');
     }
   }
 

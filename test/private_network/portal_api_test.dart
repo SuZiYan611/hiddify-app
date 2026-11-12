@@ -91,4 +91,23 @@ void main() {
     await expectLater(redirect.me('fixture-session'), throwsA(isA<PortalFailure>()));
     await expectLater(malformed.login('test@example.com', 'fixture-password'), throwsA(isA<PortalFailure>()));
   });
+  test('rate limiting and invited registration return actionable messages', () async {
+    for (final status in [429, 400]) {
+      final api = PortalApi(origin.origin, adapter: FakeAdapter((_) => jsonResponse({'detail': 'private-detail'}, status)));
+      addTearDown(api.close);
+      await expectLater(api.register('test@example.com', 'fixture-password', 'fixture-password'),
+        throwsA(isA<PortalFailure>().having((failure) => failure.toString(), 'message',
+          contains(status == 429 ? '频繁' : '邀请'))));
+    }
+  });
+  test('account node names are available before connecting without retaining node URIs', () {
+    final data = <String, dynamic>{'email': 'test@example.com',
+      'subscription': {'subscription_url': '${origin.origin}/sub/fixture_token'},
+      'nodes': [{'name': ' Malaysia ', 'uri': 'private-fixture-link'}]};
+    final account = PortalAccount.fromJson(data, origin);
+    expect(account.nodeNames, ['Malaysia']);
+    expect(account.toString(), isNot(contains('private-fixture')));
+    data['nodes'] = [{'name': ''}];
+    expect(() => PortalAccount.fromJson(data, origin), throwsA(isA<PortalFailure>()));
+  });
 }

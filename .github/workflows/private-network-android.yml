@@ -62,7 +62,7 @@ jobs:
         run: |
           make common-prepare
           curl --fail --location --retry 3 --output "$RUNNER_TEMP/hiddify-android.tar.gz" 'https://github.com/hiddify/hiddify-core/releases/download/draft/hiddify-lib-android.tar.gz'
-          echo "5d7ee5d91824202d8b3b62844291c1a62f17dde3c855d0e8a13081fd234405fb  $RUNNER_TEMP/hiddify-android.tar.gz" | sha256sum --check --strict
+          echo "c4f8e82057bd277490d989f88ca028af49823fd9d285ad5f5291003a9b8a259c  $RUNNER_TEMP/hiddify-android.tar.gz" | sha256sum --check --strict
           mkdir -p android/app/libs
           tar -xzf "$RUNNER_TEMP/hiddify-android.tar.gz" -C android/app/libs
           # Check the exact native API that the selected application revision requires.
@@ -81,7 +81,7 @@ jobs:
           python3 - <<'PY'
           import json, os
           from urllib.parse import urlsplit
-          origin = os.environ.get('PORTAL_ORIGIN', '').strip()
+          origin = os.environ.get('PORTAL_ORIGIN', '').strip() or 'https://api.gobackmsia.work'
           if origin:
               url = urlsplit(origin)
               if url.scheme != 'https' or not url.hostname or url.username or url.password or url.path not in ('', '/') or url.query or url.fragment:

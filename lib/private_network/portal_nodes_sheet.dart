@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hiddify/features/proxy/data/proxy_data_providers.dart';
 import 'package:hiddify/features/proxy/model/proxy_entity.dart';
 import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
+import 'package:hiddify/private_network/portal_session.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class PortalNodesSheet extends ConsumerStatefulWidget {
@@ -36,7 +37,16 @@ class _PortalNodesSheetState extends ConsumerState<PortalNodesSheet> {
           error: (_, _) => const Center(child: Text('无法读取节点，请检查连接服务。')),
           data: (group) {
             if (group == null || group.items.isEmpty) {
-              return const Center(child: Text('请先连接网络，再查看节点和实测延迟。', textAlign: TextAlign.center));
+              final session = ref.watch(portalSessionProvider);
+              final names = session.account?.nodeNames ?? const <String>[];
+              if (!session.profileReady || names.isEmpty) {
+                return const Center(child: Text('账户节点尚未就绪，请更新订阅。', textAlign: TextAlign.center));
+              }
+              return ListView(children: [
+                const Padding(padding: EdgeInsets.all(12), child: Text('已导入以下账户节点。连接后可选择线路并测量延迟。')),
+                for (final name in names) ListTile(leading: const Icon(Icons.dns_outlined),
+                  title: Text(name), subtitle: const Text('已导入 · 尚未连接')),
+              ]);
             }
             final items = group.items.where((item) => !item.tag.contains('§hide§')).toList();
             return Column(children: [

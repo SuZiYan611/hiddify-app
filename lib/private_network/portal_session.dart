@@ -38,7 +38,7 @@ class PortalSession extends ChangeNotifier {
   PortalApi? _api;
   String? _token;
   PortalAccount? account;
-  String endpoint = const String.fromEnvironment('PORTAL_BASE_URL');
+  String endpoint = const String.fromEnvironment('PORTAL_BASE_URL', defaultValue: 'https://api.gobackmsia.work');
   String? message;
   bool busy = true;
   bool ready = false;
@@ -52,8 +52,6 @@ class PortalSession extends ChangeNotifier {
     message = null;
     _changed();
     try {
-      final saved = readOrigin();
-      if (saved != null) endpoint = saved;
       await _clearProfiles();
       ready = true;
     } catch (_) {
