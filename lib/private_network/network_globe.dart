@@ -134,7 +134,7 @@ class _NetworkGlobeState extends State<NetworkGlobe> with SingleTickerProviderSt
                         } else if (_touches.length == 1 && previous != null) {
                           final delta = event.localPosition - previous;
                           _manualRotation += delta.dx / size.shortestSide * 360;
-                          _tilt = (_tilt - delta.dy / size.shortestSide * math.pi).clamp(-1.15, 1.15);
+                          _tilt = (_tilt + delta.dy / size.shortestSide * math.pi).clamp(-1.15, 1.15);
                         }
                       });
                     },
