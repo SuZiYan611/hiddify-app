@@ -23,6 +23,8 @@ class _NetworkGlobeState extends State<NetworkGlobe> with SingleTickerProviderSt
   double _tilt = 0;
   double _zoom = 1;
   double _gestureZoom = 1;
+  final _touches = <int, Offset>{};
+  double _pinchDistance = 0;
   int? _selectedNode;
 
   static Future<List<List<List<double>>>> _loadLand() async {
@@ -109,29 +111,46 @@ class _NetworkGlobeState extends State<NetworkGlobe> with SingleTickerProviderSt
                 final size = Size(constraints.maxWidth, constraints.maxHeight);
                 return GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onScaleStart: (_) {
-                    _gestureZoom = _zoom;
-                    _rotation.stop();
-                  },
-                  onScaleUpdate: (details) => setState(() {
-                    if (details.pointerCount > 1) {
-                      _zoom = (_gestureZoom * details.scale).clamp(.72, 1.6);
-                    } else {
-                      _manualRotation += details.focalPointDelta.dx / size.shortestSide * 360;
-                      _tilt = (_tilt - details.focalPointDelta.dy / size.shortestSide * math.pi).clamp(-1.15, 1.15);
-                    }
-                  }),
+                  onPanStart: (_) {},
+                  onPanUpdate: (_) {},
                   onTapUp: (details) => _pickNode(details.localPosition, size, _rotation.value),
-                  child: CustomPaint(
-                    painter: _GlobePainter(
-                      progress: _rotation.value,
-                      land: snapshot.data ?? const [],
-                      dark: Theme.of(context).brightness == Brightness.dark,
-                      nodes: widget.nodes,
-                      selectedNode: _selectedNode,
-                      rotation: _manualRotation,
-                      tilt: _tilt,
-                      zoom: _zoom,
+                  child: Listener(
+                    onPointerDown: (event) {
+                      _rotation.stop();
+                      _touches[event.pointer] = event.localPosition;
+                      if (_touches.length == 2) {
+                        _pinchDistance = (_touches.values.first - _touches.values.last).distance;
+                        _gestureZoom = _zoom;
+                      }
+                    },
+                    onPointerMove: (event) {
+                      final previous = _touches[event.pointer];
+                      _touches[event.pointer] = event.localPosition;
+                      setState(() {
+                        if (_touches.length == 2 && _pinchDistance > 0) {
+                          _zoom =
+                              (_gestureZoom * (_touches.values.first - _touches.values.last).distance / _pinchDistance)
+                                  .clamp(.65, 2.5);
+                        } else if (_touches.length == 1 && previous != null) {
+                          final delta = event.localPosition - previous;
+                          _manualRotation += delta.dx / size.shortestSide * 360;
+                          _tilt = (_tilt - delta.dy / size.shortestSide * math.pi).clamp(-1.15, 1.15);
+                        }
+                      });
+                    },
+                    onPointerUp: (event) => _touches.remove(event.pointer),
+                    onPointerCancel: (event) => _touches.remove(event.pointer),
+                    child: CustomPaint(
+                      painter: _GlobePainter(
+                        progress: _rotation.value,
+                        land: snapshot.data ?? const [],
+                        dark: Theme.of(context).brightness == Brightness.dark,
+                        nodes: widget.nodes,
+                        selectedNode: _selectedNode,
+                        rotation: _manualRotation,
+                        tilt: _tilt,
+                        zoom: _zoom,
+                      ),
                     ),
                   ),
                 );
@@ -217,6 +236,18 @@ class _GlobePainter extends CustomPainter {
           for (final point in visibleSegment.skip(1)) {
             path.lineTo(point.dx, point.dy);
           }
+          // Close along the spherical horizon instead of cutting across the globe.
+          final from = visibleSegment.last - center;
+          final to = visibleSegment.first - center;
+          final startAngle = math.atan2(from.dy, from.dx);
+          var sweep = math.atan2(to.dy, to.dx) - startAngle;
+          while (sweep > math.pi) {
+            sweep -= 2 * math.pi;
+          }
+          while (sweep < -math.pi) {
+            sweep += 2 * math.pi;
+          }
+          path.arcTo(Rect.fromCircle(center: center, radius: radius), startAngle, sweep, false);
           canvas.drawPath(path..close(), fill);
         }
         visibleSegment.clear();
