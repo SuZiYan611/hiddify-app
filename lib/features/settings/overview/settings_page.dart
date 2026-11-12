@@ -1,3 +1,4 @@
+import 'package:hiddify/private_network/gbm_update_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
@@ -142,6 +143,7 @@ class SettingsPage extends HookConsumerWidget {
       ),
       body: ListView(
         children: [
+          const GbmUpdateSettings(),
           // TipCard(message: t.settings.experimentalMsg),
           SettingsSection(
             title: t.pages.settings.general.title,

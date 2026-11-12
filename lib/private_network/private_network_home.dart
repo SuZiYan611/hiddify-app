@@ -1,3 +1,4 @@
+import 'package:hiddify/private_network/gbm_update_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hiddify/core/http_client/http_client_provider.dart';
@@ -81,43 +82,48 @@ class _PrivateNetworkHomeState extends ConsumerState<PrivateNetworkHome> {
         status is! Disconnecting &&
         !connection.isLoading &&
         ((running || transitioning) || (session.profileReady && ownProfile));
-    return Scaffold(
-      body: SafeArea(
-        child: PageView(
-          controller: _pageController,
-          physics: const NeverScrollableScrollPhysics(),
-          children: [
-            PageView(
-              controller: _verticalPageController,
-              scrollDirection: Axis.vertical,
+    return Stack(
+      children: [
+        const GbmUpdateSettings(watcher: true),
+        Scaffold(
+          body: SafeArea(
+            child: PageView(
+              controller: _pageController,
               physics: const NeverScrollableScrollPhysics(),
               children: [
-                _ConnectionOverview(
-                  account: account,
-                  nodeName: nodeName,
-                  nodeDelay: nodeDelay,
-                  running: running,
-                  transitioning: transitioning,
-                  canTap: canTap,
-                  actionLabel: actionLabel,
-                  onToggle: _toggle,
-                  onOpenRouting: _showRoutingPage,
-                  onOpenDetails: _showDetailsPage,
+                PageView(
+                  controller: _verticalPageController,
+                  scrollDirection: Axis.vertical,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    _ConnectionOverview(
+                      account: account,
+                      nodeName: nodeName,
+                      nodeDelay: nodeDelay,
+                      running: running,
+                      transitioning: transitioning,
+                      canTap: canTap,
+                      actionLabel: actionLabel,
+                      onToggle: _toggle,
+                      onOpenRouting: _showRoutingPage,
+                      onOpenDetails: _showDetailsPage,
+                    ),
+                    _ConnectionDetails(
+                      account: account,
+                      session: session,
+                      running: running,
+                      proxy: proxy,
+                      onBack: _showOverviewPage,
+                      onOpenRouting: _showRoutingPage,
+                    ),
+                  ],
                 ),
-                _ConnectionDetails(
-                  account: account,
-                  session: session,
-                  running: running,
-                  proxy: proxy,
-                  onBack: _showOverviewPage,
-                  onOpenRouting: _showRoutingPage,
-                ),
+                _AppRoutingPage(onBack: _showConnectionPage),
               ],
             ),
-            _AppRoutingPage(onBack: _showConnectionPage),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }

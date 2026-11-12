@@ -21,8 +21,8 @@ class _NetworkGlobeState extends State<NetworkGlobe> with SingleTickerProviderSt
   late final Future<List<List<List<double>>>> _land = _cachedLand ??= _loadLand();
   double _manualRotation = 0;
   double _tilt = 0;
-  double _zoom = 1;
-  double _gestureZoom = 1;
+  double _zoom = 1.1;
+  double _gestureZoom = 1.1;
   final _touches = <int, Offset>{};
   double _pinchDistance = 0;
   int? _selectedNode;
@@ -80,14 +80,15 @@ class _NetworkGlobeState extends State<NetworkGlobe> with SingleTickerProviderSt
       final rotatedZ = z * cosYaw - x * sinYaw;
       final projectedY = y * cosTilt - rotatedZ * sinTilt;
       final depth = y * sinTilt + rotatedZ * cosTilt;
-      if (depth > 0) {
-        final stackOffset = (index - (widget.nodes.length - 1) / 2) * 16.0;
+      if (depth > .04) {
+        final stackOffset = (index - (widget.nodes.length - 1) / 2) * 48.0;
         final position = center + Offset(rotatedX * radius + stackOffset, -projectedY * radius);
         markers.add((index, position, depth));
       }
     }
-    for (final marker in markers.reversed) {
-      if ((point - marker.$2).distance <= 26) {
+    markers.sort((a, b) => (point - a.$2).distanceSquared.compareTo((point - b.$2).distanceSquared));
+    for (final marker in markers) {
+      if ((point - marker.$2).distance <= 28) {
         setState(() => _selectedNode = marker.$1);
         widget.onNodeSelected?.call(marker.$1);
         return;
@@ -130,7 +131,7 @@ class _NetworkGlobeState extends State<NetworkGlobe> with SingleTickerProviderSt
                         if (_touches.length == 2 && _pinchDistance > 0) {
                           _zoom =
                               (_gestureZoom * (_touches.values.first - _touches.values.last).distance / _pinchDistance)
-                                  .clamp(.65, 2.5);
+                                  .clamp(.65, 5.0);
                         } else if (_touches.length == 1 && previous != null) {
                           final delta = event.localPosition - previous;
                           _manualRotation += delta.dx / size.shortestSide * 360;
@@ -303,10 +304,20 @@ class _GlobePainter extends CustomPainter {
       if (node.longitude == null || node.latitude == null) continue;
       final point = project(node.longitude!, node.latitude!);
       if (point.$2 <= .04) continue;
-      final position = point.$1 + Offset((index - (nodes.length - 1) / 2) * 16.0, 0);
+      final position = point.$1 + Offset((index - (nodes.length - 1) / 2) * 48.0, 0);
       final selected = selectedNode == index;
-      canvas.drawCircle(position, selected ? 10 : 7, Paint()..color = dark ? Colors.white : Colors.black);
-      canvas.drawCircle(position, selected ? 5 : 3, Paint()..color = dark ? Colors.black : Colors.white);
+      if (selected) {
+        canvas.drawCircle(
+          position,
+          19,
+          Paint()
+            ..color = dark ? Colors.white38 : Colors.black26
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2,
+        );
+      }
+      canvas.drawCircle(position, selected ? 14 : 11, Paint()..color = dark ? Colors.white : Colors.black);
+      canvas.drawCircle(position, selected ? 6 : 4, Paint()..color = dark ? Colors.black : Colors.white);
       if (selected) {
         final text = TextPainter(
           text: TextSpan(
@@ -318,7 +329,7 @@ class _GlobePainter extends CustomPainter {
           ellipsis: '…',
         )..layout(maxWidth: size.width * .55);
         final rect = RRect.fromRectAndRadius(
-          Rect.fromLTWH(position.dx - text.width / 2 - 9, position.dy - 34, text.width + 18, text.height + 8),
+          Rect.fromLTWH(position.dx - text.width / 2 - 9, position.dy - 48, text.width + 18, text.height + 8),
           const Radius.circular(12),
         );
         canvas.drawRRect(rect, Paint()..color = dark ? Colors.white : Colors.black);
