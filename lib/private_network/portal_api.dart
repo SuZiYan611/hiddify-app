@@ -71,13 +71,14 @@ class PortalAccount {
             ))) {
       throw const PortalFailure('后台节点数据格式不正确。');
     }
-    if (rawNodes is List && rawNodes.any((raw) {
-      final node = raw as Map;
-      final longitude = node['longitude'];
-      final latitude = node['latitude'];
-      return (longitude != null && (longitude is! num || longitude < -180 || longitude > 180)) ||
-          (latitude != null && (latitude is! num || latitude < -90 || latitude > 90));
-    })) {
+    if (rawNodes is List &&
+        rawNodes.any((raw) {
+          final node = raw as Map;
+          final longitude = node['longitude'];
+          final latitude = node['latitude'];
+          return (longitude != null && (longitude is! num || longitude < -180 || longitude > 180)) ||
+              (latitude != null && (latitude is! num || latitude < -90 || latitude > 90));
+        })) {
       throw const PortalFailure('后台节点坐标数据格式不正确。');
     }
     if (rawDays != null && (rawDays is! int || rawDays < 0)) {

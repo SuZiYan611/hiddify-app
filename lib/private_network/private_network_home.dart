@@ -1,23 +1,25 @@
-import 'package:hiddify/private_network/gbm_update_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hiddify/core/http_client/http_client_provider.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/app_based_routing/model/per_app_proxy_mode.dart';
-import 'package:hiddify/features/app_based_routing/data/selected_data_provider.dart';
 import 'package:hiddify/features/app_based_routing/overview/app_based_routing_notifier.dart';
+import 'package:hiddify/features/app_based_routing/overview/app_list_page.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
+import 'package:hiddify/features/proxy/data/proxy_data_providers.dart';
 import 'package:hiddify/features/proxy/model/proxy_entity.dart';
+import 'package:hiddify/features/proxy/overview/proxies_overview_notifier.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart' show OutboundInfo;
+import 'package:hiddify/private_network/gbm_china_bypass_defaults.dart';
+import 'package:hiddify/private_network/gbm_update_settings.dart';
 import 'package:hiddify/private_network/network_globe.dart';
 import 'package:hiddify/private_network/portal_account_page.dart';
+import 'package:hiddify/private_network/portal_api.dart';
 import 'package:hiddify/private_network/portal_gate.dart';
 import 'package:hiddify/private_network/portal_nodes_sheet.dart';
-import 'package:hiddify/private_network/portal_api.dart';
 import 'package:hiddify/private_network/portal_session.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -30,6 +32,14 @@ class PrivateNetworkHome extends ConsumerStatefulWidget {
 class _PrivateNetworkHomeState extends ConsumerState<PrivateNetworkHome> {
   final _pageController = PageController();
   final _verticalPageController = PageController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      GbmChinaBypassHelper.ensureDefaultEnabled(ref);
+    });
+  }
 
   @override
   void dispose() {
@@ -54,7 +64,9 @@ class _PrivateNetworkHomeState extends ConsumerState<PrivateNetworkHome> {
     try {
       await ref.read(connectionNotifierProvider.notifier).toggleConnection();
     } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('连接操作失败，请查看设置中的诊断日志。')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('连接操作失败，请查看设置中的诊断日志。')));
+      }
     }
   }
 
@@ -128,7 +140,7 @@ class _PrivateNetworkHomeState extends ConsumerState<PrivateNetworkHome> {
   }
 }
 
-class _ConnectionOverview extends StatelessWidget {
+class _ConnectionOverview extends ConsumerWidget {
   const _ConnectionOverview({
     required this.account,
     required this.nodeName,
@@ -153,83 +165,167 @@ class _ConnectionOverview extends StatelessWidget {
   final VoidCallback onOpenDetails;
 
   @override
-  Widget build(BuildContext context) => _PageGesture(
-    onLeft: onOpenRouting,
-    onVertical: onOpenDetails,
-    child: Column(
-      children: [
-        Expanded(
-          child: Center(
-            child: SingleChildScrollView(
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(20),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 640),
-                child: NetworkPanel(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 320),
-                        child: NetworkGlobe(nodes: account?.nodes ?? const []),
-                      ),
-                      const SizedBox(height: 16),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 320),
-                        child: Semantics(
-                          button: true,
-                          label: actionLabel,
-                          child: Material(
-                            color: canTap ? const Color(0xff111111) : const Color(0xff777777),
-                            borderRadius: BorderRadius.circular(32),
-                            child: InkWell(
-                              onTap: canTap ? onToggle : null,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final chinaBypass = ref.watch(Preferences.perAppProxyEnabled);
+    final session = ref.watch(portalSessionProvider);
+
+    return _PageGesture(
+      onLeft: onOpenRouting,
+      onVertical: onOpenDetails,
+      child: Column(
+        children: [
+          Expanded(
+            child: Center(
+              child: SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(20),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 640),
+                  child: NetworkPanel(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 320),
+                          child: NetworkGlobe(
+                            nodes: account?.nodes ?? const [],
+                            onNodeSelected: (index) async {
+                              final nodes = account?.nodes;
+                              if (nodes != null && index >= 0 && index < nodes.length) {
+                                final targetName = nodes[index].name.toLowerCase();
+                                final group = ref.read(proxiesOverviewNotifierProvider).valueOrNull;
+                                if (group != null) {
+                                  for (final item in group.items) {
+                                    if (item.name.toLowerCase().contains(targetName) ||
+                                        targetName.contains(item.name.toLowerCase())) {
+                                      try {
+                                        await ref.read(proxyRepositoryProvider).selectProxy(group.tag, item.tag).run();
+                                      } catch (_) {}
+                                      break;
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 320),
+                          child: Semantics(
+                            button: true,
+                            label: actionLabel,
+                            child: Material(
+                              color: canTap ? const Color(0xff111111) : const Color(0xff777777),
                               borderRadius: BorderRadius.circular(32),
-                              child: SizedBox(
-                                height: 58,
-                                width: double.infinity,
-                                child: running
-                                    ? Row(
-                                        children: [
-                                          const SizedBox(width: 20),
-                                          const Icon(Icons.power_settings_new_rounded, color: Colors.white, size: 22),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Text(
-                                              nodeName.isEmpty ? '已连接' : nodeName,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              textAlign: TextAlign.left,
-                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                              child: InkWell(
+                                onTap: canTap ? onToggle : null,
+                                borderRadius: BorderRadius.circular(32),
+                                child: SizedBox(
+                                  height: 58,
+                                  width: double.infinity,
+                                  child: running
+                                      ? Row(
+                                          children: [
+                                            const SizedBox(width: 20),
+                                            const Icon(Icons.power_settings_new_rounded, color: Colors.white, size: 22),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                nodeName.isEmpty ? '已连接' : nodeName,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                textAlign: TextAlign.left,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
                                             ),
+                                            const SizedBox(width: 8),
+                                            _NodeLatency(delay: nodeDelay),
+                                            const SizedBox(width: 20),
+                                          ],
+                                        )
+                                      : Center(
+                                          child: Icon(
+                                            transitioning ? Icons.stop_rounded : Icons.power_settings_new_rounded,
+                                            color: Colors.white,
+                                            size: 24,
                                           ),
-                                          const SizedBox(width: 8),
-                                          _NodeLatency(delay: nodeDelay),
-                                          const SizedBox(width: 20),
-                                        ],
-                                      )
-                                    : Center(
-                                        child: Icon(
-                                          transitioning ? Icons.stop_rounded : Icons.power_settings_new_rounded,
-                                          color: Colors.white,
-                                          size: 24,
                                         ),
-                                      ),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 14),
+                        // 节点选择与分流控制栏
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            ActionChip(
+                              avatar: const Icon(Icons.dns_outlined, size: 15),
+                              label: Text(
+                                nodeName.isEmpty || nodeName == '正在识别节点' ? '选择节点' : nodeName,
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                              ),
+                              onPressed: session.busy
+                                  ? null
+                                  : () => showModalBottomSheet<void>(
+                                      context: context,
+                                      isScrollControlled: true,
+                                      useSafeArea: true,
+                                      builder: (_) => const PortalNodesSheet(),
+                                    ),
+                            ),
+                            ActionChip(
+                              avatar: Icon(
+                                chinaBypass ? Icons.check_circle_rounded : Icons.do_not_disturb_on_rounded,
+                                size: 15,
+                                color: chinaBypass ? const Color(0xff10b981) : Colors.grey,
+                              ),
+                              label: Text(
+                                chinaBypass ? '大陆分流: 开' : '大陆分流: 关',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: chinaBypass ? null : Colors.grey,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              onPressed: () async {
+                                await GbmChinaBypassHelper.toggleEnabled(ref, !chinaBypass);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      duration: const Duration(seconds: 2),
+                                      content: Text(!chinaBypass ? '已开启中国应用分流直连（微信、淘宝等不走 VPN）' : '已关闭分流直连（全部流量走 VPN）'),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.tune_rounded, size: 19),
+                              tooltip: '应用分流管理',
+                              onPressed: onOpenRouting,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 class _ConnectionDetails extends StatelessWidget {
@@ -303,8 +399,8 @@ class _ConnectionDetails extends StatelessWidget {
                 const Text('我的订阅', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
                 const SizedBox(height: 10),
                 Text(
-                  account?.remainingDays == 0
-                      ? '订阅已到期，暂不可连接'
+                  account == null
+                      ? '未登录账户'
                       : session.profileReady
                       ? '账户订阅已就绪'
                       : '账户订阅待更新',
@@ -337,34 +433,32 @@ class _AppRoutingPage extends ConsumerStatefulWidget {
 
 class _AppRoutingPageState extends ConsumerState<_AppRoutingPage> {
   bool _applying = false;
-  Future<void> _applyChinaDirectList() async {
+
+  Future<void> _syncOnline() async {
     if (_applying) return;
     setState(() => _applying = true);
     try {
-      const base = 'https://raw.githubusercontent.com/mnixry/direct-android-ruleset/rules/@Merged';
-      final client = ref.read(httpClientProvider);
-      final responses = await Future.wait([
-        client.get<String>('$base/APP.mutated.yaml'),
-        client.get<String>('$base/GAME.mutated.yaml'),
-      ]);
-      final yaml = responses.map((r) => r.data ?? '').join('\n');
-      final packages = RegExp(
-        r'^\s*-\s*PROCESS-NAME,([^,#\s]+)',
-        multiLine: true,
-      ).allMatches(yaml).map((m) => m.group(1)!.trim()).toSet();
-      if (packages.isEmpty) throw const FormatException('Empty app list');
-      await ref.read(appProxyDataSourceProvider).applyAutoSelection(autoList: packages, mode: AppProxyMode.exclude);
-      await ref.read(Preferences.perAppProxyMode.notifier).update(AppProxyMode.exclude);
-      await ref.read(Preferences.autoAppsSelectionOffByUser.notifier).update(true);
-      await ref.read(Preferences.perAppProxyEnabled.notifier).update(true);
-      await ref.read(appBasedRoutingProvider.future);
-      await ref.read(appBasedRoutingProvider.notifier).setEnabled(true);
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('已载入 ${packages.length} 个大陆应用直连规则，下次连接时生效。')));
+      final count = await GbmChinaBypassHelper.syncFromRemote(ref);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已从云端同步 $count 个大陆应用直连规则。')));
+      }
     } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('应用分流设置失败，请重试。')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('云端同步失败，已保留现有或内置白名单。')));
+      }
+    } finally {
+      if (mounted) setState(() => _applying = false);
+    }
+  }
+
+  Future<void> _restoreDefaults() async {
+    if (_applying) return;
+    setState(() => _applying = true);
+    try {
+      final count = await GbmChinaBypassHelper.restoreDefaultList(ref);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已恢复内置默认大陆白名单（共 $count 款核心应用）。')));
+      }
     } finally {
       if (mounted) setState(() => _applying = false);
     }
@@ -372,60 +466,152 @@ class _AppRoutingPageState extends ConsumerState<_AppRoutingPage> {
 
   @override
   Widget build(BuildContext context) {
+    final enabled = ref.watch(Preferences.perAppProxyEnabled);
+    final activeCount = ref.watch(Preferences.excludeApps).length;
+
     return _PageGesture(
       onRight: widget.onBack,
       child: Column(
         children: [
+          Row(
+            children: [
+              IconButton(icon: const Icon(Icons.arrow_back_rounded), onPressed: widget.onBack, tooltip: '返回'),
+              const Expanded(
+                child: Text('应用分流设置', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
           Expanded(
             child: Center(
               child: SingleChildScrollView(
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(24),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 520),
-                  child: NetworkPanel(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Icon(Icons.apps_rounded, size: 42),
-                        const SizedBox(height: 16),
-                        const Text(
-                          '应用分流',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      NetworkPanel(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: enabled
+                                        ? const Color(0xff10b981).withValues(alpha: 0.15)
+                                        : Colors.grey.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    enabled ? Icons.verified_user_rounded : Icons.shield_outlined,
+                                    color: enabled ? const Color(0xff10b981) : Colors.grey,
+                                    size: 28,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        '绕过中国大陆应用',
+                                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        enabled ? '分流直连已开启' : '分流直连已关闭',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: enabled ? const Color(0xff10b981) : Colors.grey,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Switch.adaptive(
+                                  value: enabled,
+                                  onChanged: (val) async {
+                                    await GbmChinaBypassHelper.toggleEnabled(ref, val);
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              enabled
+                                  ? '已开启直连分流：选中的国内应用（微信、支付宝、淘宝、抖音、B站等）直连不消耗代理流量；Google、YouTube、Twitter、ChatGPT 等外网走加密 VPN。'
+                                  : '已关闭直连分流：所有手机网络流量均通过海外 VPN 节点代理。',
+                              style: TextStyle(
+                                fontSize: 13,
+                                height: 1.5,
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.75),
+                              ),
+                            ),
+                            if (enabled) ...[
+                              const Divider(height: 24),
+                              Row(
+                                children: [
+                                  const Icon(Icons.apps_rounded, size: 18),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '当前已生效直连应用: $activeCount 款',
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          '选中的中国大陆应用直连；未选中的应用（包括 Google 服务）继续走 VPN。名单可手动增删。',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(height: 1.6),
+                      ),
+                      const SizedBox(height: 16),
+                      NetworkPanel(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text('应用名单管理', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 12),
+                            FilledButton.icon(
+                              onPressed: () async {
+                                await ref.read(Preferences.perAppProxyMode.notifier).update(AppProxyMode.exclude);
+                                await ref.read(Preferences.autoAppsSelectionOffByUser.notifier).update(true);
+                                await ref.read(Preferences.perAppProxyEnabled.notifier).update(true);
+                                await ref.read(appBasedRoutingProvider.future);
+                                await ref.read(appBasedRoutingProvider.notifier).setEnabled(true);
+                                if (context.mounted) {
+                                  Navigator.of(
+                                    context,
+                                  ).push(MaterialPageRoute<void>(builder: (_) => const AppListPage()));
+                                }
+                              },
+                              icon: const Icon(Icons.playlist_add_check_rounded),
+                              label: const Text('手动增删直连应用 (勾选/取消)'),
+                            ),
+                            const SizedBox(height: 8),
+                            OutlinedButton.icon(
+                              onPressed: _applying ? null : _syncOnline,
+                              icon: _applying
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : const Icon(Icons.cloud_download_outlined),
+                              label: const Text('从云端更新最新大陆应用库'),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              onPressed: _applying ? null : _restoreDefaults,
+                              icon: const Icon(Icons.restore_rounded),
+                              label: const Text('恢复内置默认推荐白名单'),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 20),
-                        FilledButton.icon(
-                          onPressed: _applying ? null : _applyChinaDirectList,
-                          icon: _applying
-                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                              : const Icon(Icons.download_rounded),
-                          label: const Text('载入大陆直连名单'),
-                        ),
-                        const SizedBox(height: 8),
-                        OutlinedButton.icon(
-                          onPressed: () async {
-                            await ref.read(Preferences.perAppProxyMode.notifier).update(AppProxyMode.exclude);
-                            await ref.read(Preferences.autoAppsSelectionOffByUser.notifier).update(true);
-                            await ref.read(Preferences.perAppProxyEnabled.notifier).update(true);
-                            await ref.read(appBasedRoutingProvider.future);
-                            await ref.read(appBasedRoutingProvider.notifier).setEnabled(true);
-                            if (context.mounted) context.go('/settings/routing-options/app-list');
-                          },
-                          icon: const Icon(Icons.tune_rounded),
-                          label: const Text('手动管理直连应用'),
-                        ),
-                        const SizedBox(height: 8),
-                        const SizedBox(height: 4),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -518,7 +704,9 @@ class _NodeLatency extends StatelessWidget {
 class _PageGesture extends StatefulWidget {
   const _PageGesture({required this.child, this.onLeft, this.onRight, this.onVertical});
   final Widget child;
-  final VoidCallback? onLeft, onRight, onVertical;
+  final VoidCallback? onLeft;
+  final VoidCallback? onRight;
+  final VoidCallback? onVertical;
   @override
   State<_PageGesture> createState() => _PageGestureState();
 }
@@ -533,10 +721,11 @@ class _PageGestureState extends State<_PageGesture> {
     onPanEnd: (_) {
       if (_distance.distance < 28) return;
       if (_distance.dx.abs() > _distance.dy.abs()) {
-        if (_distance.dx < 0)
+        if (_distance.dx < 0) {
           widget.onLeft?.call();
-        else
+        } else {
           widget.onRight?.call();
+        }
       } else {
         widget.onVertical?.call();
       }
