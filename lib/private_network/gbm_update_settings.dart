@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-const _currentTag = String.fromEnvironment('GBM_RELEASE_TAG', defaultValue: 'private-network-v0.1.0-test3');
+const _currentTag = String.fromEnvironment('GBM_RELEASE_TAG', defaultValue: 'private-network-v0.1.0-test4');
 const _preference = 'gbm_auto_check_updates';
 
 /// Settings and the startup watcher use the same persisted preference.

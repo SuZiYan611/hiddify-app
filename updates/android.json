@@ -1,19 +1,19 @@
 {
-  "body": "地球节点点击与缩放、启动自动检查更新测试版。debug 签名；未验证真实 VPN 联网或应用内自动安装升级。",
+  "body": "新加坡与美国俄勒冈高速节点上线，中国大陆应用分流直连默认开启（支持一键开关与手动增删应用）。debug 签名。",
   "assets": [
     {
       "name": "GBM-Android-arm64-debug.apk",
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test3/GBM-Android-arm64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test4/GBM-Android-arm64-debug.apk",
       "state": "uploaded"
     },
     {
       "name": "GBM-Android-x86_64-debug.apk",
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test3/GBM-Android-x86_64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test4/GBM-Android-x86_64-debug.apk",
       "state": "uploaded"
     }
   ],
-  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test3",
+  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test4",
   "prerelease": true,
-  "tag_name": "private-network-v0.1.0-test3",
+  "tag_name": "private-network-v0.1.0-test4",
   "draft": false
 }
