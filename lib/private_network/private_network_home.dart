@@ -21,6 +21,7 @@ import 'package:hiddify/private_network/portal_api.dart';
 import 'package:hiddify/private_network/portal_gate.dart';
 import 'package:hiddify/private_network/portal_nodes_sheet.dart';
 import 'package:hiddify/private_network/portal_session.dart';
+import 'package:hiddify/private_network/private_network_theme.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class PrivateNetworkHome extends ConsumerStatefulWidget {
@@ -94,6 +95,7 @@ class _PrivateNetworkHomeState extends ConsumerState<PrivateNetworkHome> {
         status is! Disconnecting &&
         !connection.isLoading &&
         ((running || transitioning) || (session.profileReady && ownProfile));
+
     return Stack(
       children: [
         const GbmUpdateSettings(watcher: true),
@@ -140,6 +142,196 @@ class _PrivateNetworkHomeState extends ConsumerState<PrivateNetworkHome> {
   }
 }
 
+class GbmStatusPill extends StatelessWidget {
+  const GbmStatusPill({
+    super.key,
+    required this.running,
+    required this.transitioning,
+    this.statusName,
+  });
+
+  final bool running;
+  final bool transitioning;
+  final String? statusName;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cardBg = PrivateNetworkTheme.cardBackground(context);
+    final borderLine = PrivateNetworkTheme.borderLine(context);
+    final textMuted = PrivateNetworkTheme.textMuted(context);
+    final ink = theme.brightness == Brightness.dark ? const Color(0xFFF4F4F4) : const Color(0xFF111111);
+
+    final String text;
+    final Widget icon;
+
+    if (transitioning) {
+      text = '连接中';
+      icon = const Icon(Icons.radio_button_checked, size: 10, color: Color(0xFFF59E0B));
+    } else if (running) {
+      text = '已连接';
+      icon = const Icon(Icons.circle, size: 9, color: Color(0xFF10B981));
+    } else if (statusName == 'disconnecting') {
+      text = '断开中';
+      icon = Icon(Icons.radio_button_unchecked, size: 10, color: textMuted);
+    } else if (statusName == 'failed') {
+      text = '连接失败';
+      icon = const Icon(Icons.error_outline, size: 10, color: Color(0xFFEF4444));
+    } else {
+      text = '未连接';
+      icon = Icon(Icons.radio_button_unchecked, size: 10, color: textMuted);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderLine),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          icon,
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: ink,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class GbmNodeCard extends StatelessWidget {
+  const GbmNodeCard({
+    super.key,
+    required this.nodeName,
+    this.nodeDelay = 0,
+    required this.onTap,
+  });
+
+  final String nodeName;
+  final int nodeDelay;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cardBg = PrivateNetworkTheme.cardBackground(context);
+    final borderLine = PrivateNetworkTheme.borderLine(context);
+    final textMuted = PrivateNetworkTheme.textMuted(context);
+    final ink = theme.brightness == Brightness.dark ? const Color(0xFFF4F4F4) : const Color(0xFF111111);
+    final display = (nodeName.isEmpty || nodeName == '正在识别节点') ? '选择可用节点' : nodeName;
+
+    return Material(
+      color: cardBg,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: borderLine),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '当前节点',
+                      style: TextStyle(fontSize: 11, color: textMuted, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      display,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: ink),
+                    ),
+                  ],
+                ),
+              ),
+              if (nodeDelay > 0) ...[
+                const SizedBox(width: 8),
+                _NodeLatency(delay: nodeDelay),
+              ],
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right_rounded, color: textMuted, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class GbmBottomBar extends StatelessWidget {
+  const GbmBottomBar({
+    super.key,
+    required this.onOpenAccount,
+  });
+
+  final VoidCallback onOpenAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final ink = isDark ? const Color(0xFFF4F4F4) : const Color(0xFF111111);
+    final textMuted = PrivateNetworkTheme.textMuted(context);
+    final borderLine = PrivateNetworkTheme.borderLine(context);
+
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(top: BorderSide(color: borderLine)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: () {},
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.power_settings_new_rounded, size: 20, color: ink),
+                  const SizedBox(height: 2),
+                  Text('连接', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: ink)),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: onOpenAccount,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.person_outline_rounded, size: 20, color: textMuted),
+                  const SizedBox(height: 2),
+                  Text('账户', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: textMuted)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ConnectionOverview extends ConsumerWidget {
   const _ConnectionOverview({
     required this.account,
@@ -153,6 +345,7 @@ class _ConnectionOverview extends ConsumerWidget {
     required this.onOpenRouting,
     required this.onOpenDetails,
   });
+
   final PortalAccount? account;
   final String nodeName;
   final int nodeDelay;
@@ -168,25 +361,98 @@ class _ConnectionOverview extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final chinaBypass = ref.watch(Preferences.perAppProxyEnabled);
     final session = ref.watch(portalSessionProvider);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textMuted = PrivateNetworkTheme.textMuted(context);
+    final ink = isDark ? const Color(0xFFF4F4F4) : const Color(0xFF111111);
+    final primaryBtnBg = PrivateNetworkTheme.primaryButtonBg(context);
+    final primaryBtnFg = PrivateNetworkTheme.primaryButtonFg(context);
+    final disabledBg = isDark ? const Color(0xFF2C2C2E) : const Color(0xFFDCDCE0);
 
     return _PageGesture(
       onLeft: onOpenRouting,
       onVertical: onOpenDetails,
       child: Column(
         children: [
+          // Top bar with GBM wordmark and action shortcuts
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 12, 2),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'GBM',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                    color: ink,
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.person_outline_rounded),
+                      tooltip: '我的账户',
+                      color: ink,
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(builder: (_) => const PortalAccountPage()),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.settings_outlined),
+                      tooltip: '设置',
+                      color: ink,
+                      onPressed: () => context.go('/settings'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
           Expanded(
             child: Center(
               child: SingleChildScrollView(
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(20),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 640),
-                  child: NetworkPanel(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 320),
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Header title & real connection status pill
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '连接你的世界',
+                              style: TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.5,
+                                color: ink,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            GbmStatusPill(
+                              running: running,
+                              transitioning: transitioning,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Interactive 3D Canvas Globe
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 300, maxHeight: 300),
                           child: NetworkGlobe(
                             nodes: account?.nodes ?? const [],
                             onNodeSelected: (index) async {
@@ -209,90 +475,85 @@ class _ConnectionOverview extends ConsumerWidget {
                             },
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 320),
-                          child: Semantics(
-                            button: true,
-                            label: actionLabel,
-                            child: Material(
-                              color: canTap ? const Color(0xff111111) : const Color(0xff777777),
-                              borderRadius: BorderRadius.circular(32),
-                              child: InkWell(
-                                onTap: canTap ? onToggle : null,
-                                borderRadius: BorderRadius.circular(32),
-                                child: SizedBox(
-                                  height: 58,
-                                  width: double.infinity,
-                                  child: running
-                                      ? Row(
-                                          children: [
-                                            const SizedBox(width: 20),
-                                            const Icon(Icons.power_settings_new_rounded, color: Colors.white, size: 22),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Text(
-                                                nodeName.isEmpty ? '已连接' : nodeName,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                textAlign: TextAlign.left,
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            _NodeLatency(delay: nodeDelay),
-                                            const SizedBox(width: 20),
-                                          ],
-                                        )
-                                      : Center(
-                                          child: Icon(
-                                            transitioning ? Icons.stop_rounded : Icons.power_settings_new_rounded,
-                                            color: Colors.white,
-                                            size: 24,
-                                          ),
-                                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Current Node Selection Card
+                      GbmNodeCard(
+                        nodeName: nodeName,
+                        nodeDelay: nodeDelay,
+                        onTap: session.busy
+                            ? null
+                            : () => showModalBottomSheet<void>(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  useSafeArea: true,
+                                  builder: (_) => const PortalNodesSheet(),
                                 ),
-                              ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Primary Connect Action Button
+                      Material(
+                        color: canTap ? primaryBtnBg : disabledBg,
+                        borderRadius: BorderRadius.circular(14),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: canTap ? onToggle : null,
+                          child: SizedBox(
+                            height: 52,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.power_settings_new_rounded,
+                                  color: canTap ? primaryBtnFg : textMuted,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  actionLabel,
+                                  style: TextStyle(
+                                    color: canTap ? primaryBtnFg : textMuted,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                        const SizedBox(height: 14),
-                        // 节点选择与分流控制栏
-                        Wrap(
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Hint text below button
+                      Center(
+                        child: Text(
+                          '旋转地球，选择你的节点',
+                          style: TextStyle(fontSize: 12, color: textMuted),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // China bypass and secondary shortcuts
+                      Center(
+                        child: Wrap(
                           alignment: WrapAlignment.center,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           spacing: 8,
                           runSpacing: 6,
                           children: [
                             ActionChip(
-                              avatar: const Icon(Icons.dns_outlined, size: 15),
-                              label: Text(
-                                nodeName.isEmpty || nodeName == '正在识别节点' ? '选择节点' : nodeName,
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                              ),
-                              onPressed: session.busy
-                                  ? null
-                                  : () => showModalBottomSheet<void>(
-                                      context: context,
-                                      isScrollControlled: true,
-                                      useSafeArea: true,
-                                      builder: (_) => const PortalNodesSheet(),
-                                    ),
-                            ),
-                            ActionChip(
                               avatar: Icon(
                                 chinaBypass ? Icons.check_circle_rounded : Icons.do_not_disturb_on_rounded,
                                 size: 15,
-                                color: chinaBypass ? const Color(0xff10b981) : Colors.grey,
+                                color: chinaBypass ? const Color(0xFF10B981) : textMuted,
                               ),
                               label: Text(
                                 chinaBypass ? '大陆分流: 开' : '大陆分流: 关',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: chinaBypass ? null : Colors.grey,
+                                  color: chinaBypass ? null : textMuted,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -302,24 +563,40 @@ class _ConnectionOverview extends ConsumerWidget {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       duration: const Duration(seconds: 2),
-                                      content: Text(!chinaBypass ? '已开启中国应用分流直连（微信、淘宝等不走 VPN）' : '已关闭分流直连（全部流量走 VPN）'),
+                                      content: Text(
+                                        !chinaBypass
+                                            ? '已开启中国应用分流直连（微信、淘宝等不走 VPN）'
+                                            : '已关闭分流直连（全部流量走 VPN）',
+                                      ),
                                     ),
                                   );
                                 }
                               },
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.tune_rounded, size: 19),
-                              tooltip: '应用分流管理',
+                            ActionChip(
+                              avatar: const Icon(Icons.tune_rounded, size: 15),
+                              label: const Text('应用分流', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
                               onPressed: onOpenRouting,
+                            ),
+                            ActionChip(
+                              avatar: const Icon(Icons.arrow_downward_rounded, size: 15),
+                              label: const Text('详细订阅', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                              onPressed: onOpenDetails,
                             ),
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
+            ),
+          ),
+
+          // Bottom navigation bar
+          GbmBottomBar(
+            onOpenAccount: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const PortalAccountPage()),
             ),
           ),
         ],
@@ -663,8 +940,8 @@ class _NodeLatency extends StatelessWidget {
       label: pending
           ? '延迟待测'
           : timeout
-          ? '延迟测试超时'
-          : '节点延迟 $delay 毫秒',
+              ? '延迟测试超时'
+              : '节点延迟 $delay 毫秒',
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

@@ -47,6 +47,8 @@ class RechargeOrder {
     required this.qrPayload,
     required this.instructions,
     this.paymentUrl,
+    this.trafficGb,
+    this.validityDays,
   });
   final String orderNo;
   final double amountMyr;
@@ -56,6 +58,8 @@ class RechargeOrder {
   final String qrPayload;
   final String instructions;
   final Uri? paymentUrl;
+  final double? trafficGb;
+  final int? validityDays;
 
   factory RechargeOrder.fromJson(Map<String, dynamic> json) {
     final rawUrl = json['payment_url'];
@@ -73,6 +77,8 @@ class RechargeOrder {
     }
     return RechargeOrder(
       paymentUrl: paymentUrl,
+      trafficGb: (json['traffic_gb'] as num?)?.toDouble(),
+      validityDays: (json['validity_days'] as num?)?.toInt(),
       orderNo: json['order_no'] as String? ?? '',
       amountMyr: (json['amount_myr'] as num?)?.toDouble() ?? 10.0,
       planName: json['plan_name'] as String? ?? '100GB 高速月包',

@@ -207,15 +207,88 @@ class _GlobePainter extends CustomPainter {
       return (center + Offset(radius * rotatedX, -radius * projectedY), depth);
     }
 
+    if (!dark) {
+      final shadowRect = Rect.fromCenter(
+        center: Offset(center.dx, center.dy + radius * 0.96),
+        width: radius * 1.5,
+        height: radius * 0.24,
+      );
+      canvas.drawOval(
+        shadowRect,
+        Paint()..shader = const RadialGradient(colors: [Color(0x30000000), Color(0x00000000)]).createShader(shadowRect),
+      );
+    }
+
     final outline = Paint()
-      ..color = dark ? const Color(0xff555555) : const Color(0xffcccccc)
+      ..color = dark ? const Color(0xff383c44) : const Color(0xffb8bfc8)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
     final globePath = Path()..addOval(Rect.fromCircle(center: center, radius: radius));
-    canvas.drawCircle(center, radius, Paint()..color = dark ? const Color(0xff202020) : const Color(0xfff7f7f7));
+
+    final sphereRect = Rect.fromCircle(center: center, radius: radius);
+    final spherePaint = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.25, -0.25),
+        radius: 0.95,
+        colors: dark
+            ? const [Color(0xff24272d), Color(0xff181a1d), Color(0xff101114)]
+            : const [Color(0xffe8ebf0), Color(0xffd2d7df), Color(0xffbcc2cb)],
+      ).createShader(sphereRect);
+    canvas.drawCircle(center, radius, spherePaint);
+
     canvas.save();
     canvas.clipPath(globePath);
-    final fill = Paint()..color = dark ? const Color(0xff484848) : const Color(0xffbfc2c3);
+
+    final graticule = Paint()
+      ..color = dark ? const Color(0x22ffffff) : const Color(0x26000000)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.75;
+
+    for (final latDeg in const [-60.0, -30.0, 0.0, 30.0, 60.0]) {
+      Path? latPath;
+      for (var lonDeg = -180.0; lonDeg <= 180.0; lonDeg += 5.0) {
+        final pt = project(lonDeg, latDeg);
+        if (pt.$2 > 0) {
+          if (latPath == null) {
+            latPath = Path()..moveTo(pt.$1.dx, pt.$1.dy);
+          } else {
+            latPath.lineTo(pt.$1.dx, pt.$1.dy);
+          }
+        } else {
+          if (latPath != null) {
+            canvas.drawPath(latPath, graticule);
+            latPath = null;
+          }
+        }
+      }
+      if (latPath != null) {
+        canvas.drawPath(latPath, graticule);
+      }
+    }
+
+    for (var lonDeg = -180.0; lonDeg < 180.0; lonDeg += 30.0) {
+      Path? lonPath;
+      for (var latDeg = -85.0; latDeg <= 85.0; latDeg += 5.0) {
+        final pt = project(lonDeg, latDeg);
+        if (pt.$2 > 0) {
+          if (lonPath == null) {
+            lonPath = Path()..moveTo(pt.$1.dx, pt.$1.dy);
+          } else {
+            lonPath.lineTo(pt.$1.dx, pt.$1.dy);
+          }
+        } else {
+          if (lonPath != null) {
+            canvas.drawPath(lonPath, graticule);
+            lonPath = null;
+          }
+        }
+      }
+      if (lonPath != null) {
+        canvas.drawPath(lonPath, graticule);
+      }
+    }
+
+    final fill = Paint()..color = dark ? const Color(0xff3f444d) : const Color(0xff9ea5af);
     for (final ring in land) {
       final vertexCount = ring.length - 1;
       if (vertexCount < 3) continue;

@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-const _currentTag = String.fromEnvironment('GBM_RELEASE_TAG', defaultValue: 'private-network-v0.1.0-test5');
+const _currentTag = String.fromEnvironment('GBM_RELEASE_TAG', defaultValue: 'private-network-v0.1.0-test6');
 const _preference = 'gbm_auto_check_updates';
 
 /// Returns update manifest URL for the active or specified platform.
