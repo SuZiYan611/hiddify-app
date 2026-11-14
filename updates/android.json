@@ -1,19 +1,19 @@
 {
-  "body": "新加坡与美国俄勒冈高速节点上线，中国大陆应用分流直连默认开启（支持一键开关与手动增删应用）。debug 签名。",
+  "body": "本次更新：注册邮箱验证码、ToyyibPay 官方订单付款页面与状态同步、长期订阅状态及未知流量展示修正。\n\nAndroid 内部测试版，使用与 test4 相同的 debug 签名，版本 5.5.7（50507）。真实付费入账尚未完成端到端实测。Windows 版本单独构建后追加。",
   "assets": [
     {
       "name": "GBM-Android-arm64-debug.apk",
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test4/GBM-Android-arm64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test5/GBM-Android-arm64-debug.apk",
       "state": "uploaded"
     },
     {
       "name": "GBM-Android-x86_64-debug.apk",
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test4/GBM-Android-x86_64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test5/GBM-Android-x86_64-debug.apk",
       "state": "uploaded"
     }
   ],
-  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test4",
+  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test5",
   "prerelease": true,
-  "tag_name": "private-network-v0.1.0-test4",
+  "tag_name": "private-network-v0.1.0-test5",
   "draft": false
 }
