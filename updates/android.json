@@ -1,18 +1,18 @@
 {
-  "tag_name": "private-network-v0.1.0-test7",
-  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test7",
-  "body": "GBM test7: monochrome sign-in, globe and payment UI; startup progress and safe retry; bounded engine handshake; compatible Android renderer.\n\nAndroid 5.5.9 (50509), release build signed with the existing Android Debug certificate for in-place upgrades. Asset filenames retain -debug.apk for updater compatibility. Windows is being packaged separately. Real funded payment and VPN end-to-end were not verified by this release acceptance.",
+  "tag_name": "private-network-v0.1.0-test8",
+  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test8",
+  "body": "GBM test8 - Android startup repair\n\nFixed repeated engine database open retries during startup by storing rebuildable native engine state on Android internal app storage. Foreground and VPN services use the same private directory. Existing account databases and subscription config paths remain intact.\n\nIncludes visible startup progress and failure recovery, bounded local handshake, and Skia rendering compatibility.\n\nVersion 5.5.10 (50510). Release/AOT build signed with the existing test certificate; legacy asset names remain compatible with the updater.\n\nThe exact x86_64 APK is checked with three cold launches on the Android emulator. This does not constitute ARM64 physical-device, payment, or production VPN end-to-end testing. Private source is maintained separately from this public distribution repository.\n",
   "prerelease": true,
   "draft": false,
   "assets": [
     {
       "name": "GBM-Android-arm64-debug.apk",
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test7/GBM-Android-arm64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test8/GBM-Android-arm64-debug.apk",
       "state": "uploaded"
     },
     {
       "name": "GBM-Android-x86_64-debug.apk",
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test7/GBM-Android-x86_64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test8/GBM-Android-x86_64-debug.apk",
       "state": "uploaded"
     }
   ]
