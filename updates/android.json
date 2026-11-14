@@ -1,18 +1,18 @@
 {
-  "tag_name": "private-network-v0.1.0-test9",
-  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test9",
-  "body": "GBM test9 - Fix black screen before login\n\nFixed the signed-out authentication container collapsing to zero width and height. The login navigator now fills the screen, including first installation and expired/missing session states. Existing authenticated home navigation remains mounted and hidden until login.\n\nThe failure was reproduced with the exact test8 APK on a separate Android user. A regression test now checks actual login page dimensions, tappable inputs and text entry in light and dark themes; the pre-fix test failed with width 0.0. All 49 private-network tests pass after the fix.\n\nVersion 5.5.11 (50511), release/AOT build, existing test signing certificate. Retains test8 engine storage fix. Exact final x86_64 APK checked on the previously black-screened test user. Physical ARM64 device execution has not been directly verified.\n\nInstall the ARM64 APK over your existing app. Legacy asset filenames are retained for updater compatibility.\n",
+  "tag_name": "private-network-v0.1.0-test10",
+  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test10",
+  "body": "GBM test10 - Minimal three-page workspace\n\nLeft: app routing and direct-connection lists. Center: globe, real connection state, node selection and connect action. Right: account, usage, renewal, refresh and sign out.\n\nRemoved the vertical detail page, bottom navigation, the three home shortcuts, and the old connection slogan. Globe rotation and zoom keep ownership of their gestures; swipe outside the globe or use the top page labels to change pages.\n\nRemoved the long license introduction and unavailable source button. Component copyright/license texts remain accessible through a compact account-footer entry, with full notices on request. Repository visibility is separate from third-party license terms.\n\nRetains signed-out black-screen and private engine storage fixes. Version 5.5.12 (50512), release/AOT build with the existing signing certificate. 53 Flutter tests passed, including gestures, large text, light/dark login visibility and readable component notices. Three-page debug runtime screenshots and final APK cold-start checks are recorded locally. Physical phone, live payment and production VPN end-to-end checks are not claimed.\n\nARM64 is the phone build. Install over the current app; no data reset is needed. Legacy asset filenames remain for updater compatibility.\n",
   "prerelease": true,
   "draft": false,
   "assets": [
     {
       "name": "GBM-Android-arm64-debug.apk",
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test9/GBM-Android-arm64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test10/GBM-Android-arm64-debug.apk",
       "state": "uploaded"
     },
     {
       "name": "GBM-Android-x86_64-debug.apk",
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test9/GBM-Android-x86_64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test10/GBM-Android-x86_64-debug.apk",
       "state": "uploaded"
     }
   ]
