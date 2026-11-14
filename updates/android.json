@@ -1,18 +1,18 @@
 {
-  "tag_name": "private-network-v0.1.0-test8",
-  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test8",
-  "body": "GBM test8 - Android startup repair\n\nFixed repeated engine database open retries during startup by storing rebuildable native engine state on Android internal app storage. Foreground and VPN services use the same private directory. Existing account databases and subscription config paths remain intact.\n\nIncludes visible startup progress and failure recovery, bounded local handshake, and Skia rendering compatibility.\n\nVersion 5.5.10 (50510). Release/AOT build signed with the existing test certificate; legacy asset names remain compatible with the updater.\n\nThe exact x86_64 APK is checked with three cold launches on the Android emulator. This does not constitute ARM64 physical-device, payment, or production VPN end-to-end testing. Private source is maintained separately from this public distribution repository.\n",
+  "tag_name": "private-network-v0.1.0-test9",
+  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test9",
+  "body": "GBM test9 - Fix black screen before login\n\nFixed the signed-out authentication container collapsing to zero width and height. The login navigator now fills the screen, including first installation and expired/missing session states. Existing authenticated home navigation remains mounted and hidden until login.\n\nThe failure was reproduced with the exact test8 APK on a separate Android user. A regression test now checks actual login page dimensions, tappable inputs and text entry in light and dark themes; the pre-fix test failed with width 0.0. All 49 private-network tests pass after the fix.\n\nVersion 5.5.11 (50511), release/AOT build, existing test signing certificate. Retains test8 engine storage fix. Exact final x86_64 APK checked on the previously black-screened test user. Physical ARM64 device execution has not been directly verified.\n\nInstall the ARM64 APK over your existing app. Legacy asset filenames are retained for updater compatibility.\n",
   "prerelease": true,
   "draft": false,
   "assets": [
     {
       "name": "GBM-Android-arm64-debug.apk",
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test8/GBM-Android-arm64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test9/GBM-Android-arm64-debug.apk",
       "state": "uploaded"
     },
     {
       "name": "GBM-Android-x86_64-debug.apk",
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test8/GBM-Android-x86_64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test9/GBM-Android-x86_64-debug.apk",
       "state": "uploaded"
     }
   ]
