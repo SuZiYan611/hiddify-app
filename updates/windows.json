@@ -1,0 +1,14 @@
+{
+  "tag_name": "private-network-v0.1.0-test7",
+  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test7",
+  "body": "Windows x64 便携测试版：解压完整文件夹后运行 GBM.exe。未做 Windows 代码签名；已完成启动存活检查，尚未验证 Windows 登录与真实 VPN 隧道。",
+  "prerelease": true,
+  "draft": false,
+  "assets": [
+    {
+      "name": "GBM-Windows-x64.zip",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test7/GBM-Windows-x64.zip",
+      "state": "uploaded"
+    }
+  ]
+}
