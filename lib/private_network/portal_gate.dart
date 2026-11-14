@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:hiddify/private_network/portal_account_page.dart';
 import 'package:hiddify/private_network/portal_session.dart';
@@ -37,6 +39,11 @@ class _PortalSignInPageState extends ConsumerState<PortalSignInPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _confirmation = TextEditingController();
+  final _code = TextEditingController();
+  Timer? _codeTimer;
+  int _codeSeconds = 0;
+  bool _sendingCode = false;
+  String? _codeMessage;
   bool _register = false;
   bool _obscure = true;
 
@@ -45,6 +52,8 @@ class _PortalSignInPageState extends ConsumerState<PortalSignInPage> {
     _email.dispose();
     _password.dispose();
     _confirmation.dispose();
+    _code.dispose();
+    _codeTimer?.cancel();
     super.dispose();
   }
 
@@ -57,10 +66,36 @@ class _PortalSignInPageState extends ConsumerState<PortalSignInPage> {
       email: _email.text,
       password: _password.text,
       confirmation: _register ? _confirmation.text : null,
+      verificationCode: _register ? _code.text.trim() : null,
     );
     if (mounted && session.account != null) {
       _password.clear();
       _confirmation.clear();
+    }
+  }
+
+  Future<void> _sendCode() async {
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(_email.text.trim())) {
+      setState(() => _codeMessage = '请先输入有效邮箱');
+      return;
+    }
+    setState(() => _sendingCode = true);
+    try {
+      await ref.read(portalSessionProvider).sendRegistrationCode(_email.text);
+      if (!mounted) return;
+      setState(() {
+        _codeSeconds = 60;
+        _codeMessage = '若邮箱符合注册条件，验证码将发送至邮箱，10分钟内有效。';
+      });
+      _codeTimer?.cancel();
+      _codeTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted || _codeSeconds <= 1) timer.cancel();
+        if (mounted) setState(() => _codeSeconds = (_codeSeconds - 1).clamp(0, 60));
+      });
+    } catch (_) {
+      if (mounted) setState(() => _codeMessage = '暂时无法发送验证码，请稍后重试。');
+    } finally {
+      if (mounted) setState(() => _sendingCode = false);
     }
   }
 
@@ -116,10 +151,7 @@ class _PortalSignInPageState extends ConsumerState<PortalSignInPage> {
                     ),
                 ],
               ),
-              if (_register) ...[
-                const SizedBox(height: 12),
-                const PortalMessage('注册目前仅限管理员邀请的邮箱。系统不会发送验证邮件；如果你的邮箱尚未获邀，请联系管理员开通。'),
-              ],
+              if (_register) ...[const SizedBox(height: 12), const PortalMessage('请先获取邮箱验证码，验证邮箱后完成注册。')],
               const SizedBox(height: 22),
               if (session.message != null) ...[PortalMessage(session.message!), const SizedBox(height: 16)],
               if (!session.ready) ...[
@@ -167,6 +199,28 @@ class _PortalSignInPageState extends ConsumerState<PortalSignInPage> {
                 if (_register) ...[
                   const SizedBox(height: 18),
                   TextFormField(
+                    controller: _code,
+                    enabled: !session.busy,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    decoration: InputDecoration(
+                      labelText: '邮箱验证码',
+                      suffixIcon: TextButton(
+                        onPressed: session.busy || _sendingCode || _codeSeconds > 0 ? null : _sendCode,
+                        child: Text(
+                          _sendingCode
+                              ? '发送中'
+                              : _codeSeconds > 0
+                              ? '${_codeSeconds}s'
+                              : '获取验证码',
+                        ),
+                      ),
+                    ),
+                    validator: (value) => RegExp(r'^\d{6}$').hasMatch(value?.trim() ?? '') ? null : '请输入6位验证码',
+                  ),
+                  if (_codeMessage != null) Text(_codeMessage!),
+                  const SizedBox(height: 18),
+                  TextFormField(
                     controller: _confirmation,
                     enabled: !session.busy,
                     decoration: const InputDecoration(labelText: '再次输入密码'),
@@ -212,7 +266,7 @@ class _PortalSignInPageState extends ConsumerState<PortalSignInPage> {
             return SingleChildScrollView(
               padding: EdgeInsets.symmetric(horizontal: wide ? 48 : 20, vertical: 24),
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight - 48, maxWidth: 1100),
+                constraints: BoxConstraints(minHeight: math.max(0.0, constraints.maxHeight - 48), maxWidth: 1100),
                 child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,

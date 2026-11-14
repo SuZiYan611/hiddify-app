@@ -37,6 +37,53 @@ Uri validateSubscription(Uri origin, String value) {
   return uri;
 }
 
+class RechargeOrder {
+  const RechargeOrder({
+    required this.orderNo,
+    required this.amountMyr,
+    required this.planName,
+    required this.recipientName,
+    required this.recipientPhone,
+    required this.qrPayload,
+    required this.instructions,
+    this.paymentUrl,
+  });
+  final String orderNo;
+  final double amountMyr;
+  final String planName;
+  final String recipientName;
+  final String recipientPhone;
+  final String qrPayload;
+  final String instructions;
+  final Uri? paymentUrl;
+
+  factory RechargeOrder.fromJson(Map<String, dynamic> json) {
+    final rawUrl = json['payment_url'];
+    final paymentUrl = rawUrl is String ? Uri.tryParse(rawUrl) : null;
+    if (rawUrl != null &&
+        (paymentUrl == null ||
+            paymentUrl.scheme != 'https' ||
+            paymentUrl.host != 'toyyibpay.com' ||
+            paymentUrl.userInfo.isNotEmpty ||
+            paymentUrl.hasPort ||
+            paymentUrl.hasQuery ||
+            paymentUrl.hasFragment ||
+            !RegExp(r'^/[A-Za-z0-9_-]+$').hasMatch(paymentUrl.path))) {
+      throw const PortalFailure('付款链接无效，请重新创建订单。');
+    }
+    return RechargeOrder(
+      paymentUrl: paymentUrl,
+      orderNo: json['order_no'] as String? ?? '',
+      amountMyr: (json['amount_myr'] as num?)?.toDouble() ?? 10.0,
+      planName: json['plan_name'] as String? ?? '100GB 高速月包',
+      recipientName: json['recipient_name'] as String? ?? 'SU ZI YAN',
+      recipientPhone: json['recipient_phone'] as String? ?? '+601165198689',
+      qrPayload: json['qr_payload'] as String? ?? '',
+      instructions: json['instructions'] as String? ?? '',
+    );
+  }
+}
+
 class PortalAccount {
   const PortalAccount({
     required this.email,
@@ -45,15 +92,27 @@ class PortalAccount {
     this.nodeNames = const [],
     this.nodes = const [],
     this.remainingDays,
+    this.lifetime = false,
+    this.usageKnown = false,
+    this.trafficUsedBytes = 0,
+    this.trafficLimitBytes = 107374182400,
+    this.planName = 'RM10 / 100GB 月包',
   });
   final String email;
   final Uri subscription;
   final String? notice;
   final List<String> nodeNames;
   final List<PortalNode> nodes;
-
-  /// null means a grandfathered account with no expiry recorded; zero is unpaid/expired.
   final int? remainingDays;
+  final bool lifetime;
+  final bool usageKnown;
+  final int trafficUsedBytes;
+  final int trafficLimitBytes;
+  final String planName;
+
+  double get usedGb => (trafficUsedBytes / (1024 * 1024 * 1024));
+  double get limitGb => (trafficLimitBytes / (1024 * 1024 * 1024));
+  double get usageRatio => trafficLimitBytes > 0 ? (trafficUsedBytes / trafficLimitBytes).clamp(0.0, 1.0) : 0.0;
 
   factory PortalAccount.fromJson(Map<String, dynamic> json, Uri origin) {
     final subscription = json['subscription'];
@@ -101,6 +160,10 @@ class PortalAccount {
           return PortalNode(name: name, longitude: longitude, latitude: latitude);
         })
         .toList(growable: false);
+    final trafficUsed = (json['traffic_used_bytes'] as num?)?.toInt() ?? 0;
+    final trafficLimit = (json['traffic_limit_bytes'] as num?)?.toInt() ?? 107374182400;
+    final plan = json['plan_name'] as String? ?? 'RM10 / 100GB 月包';
+
     return PortalAccount(
       email: email,
       subscription: validateSubscription(origin, subscription['subscription_url'] as String),
@@ -108,6 +171,17 @@ class PortalAccount {
       nodeNames: List.unmodifiable(nodes.map((node) => node.name)),
       nodes: List.unmodifiable(nodes),
       remainingDays: rawDays as int?,
+      lifetime: json['subscription_lifetime'] == true,
+      usageKnown:
+          json['traffic_used_bytes'] is num &&
+          json['traffic_limit_bytes'] is num &&
+          (json['traffic_used_bytes'] as num).isFinite &&
+          (json['traffic_limit_bytes'] as num).isFinite &&
+          (json['traffic_used_bytes'] as num) >= 0 &&
+          (json['traffic_limit_bytes'] as num) > 0,
+      trafficUsedBytes: trafficUsed,
+      trafficLimitBytes: trafficLimit,
+      planName: plan,
     );
   }
 
@@ -170,7 +244,7 @@ class PortalApi {
         throw const PortalFailure('账户配置暂时失败，请稍后重试或联系管理员。');
       }
       if (status == 422 && path == '/api/register') {
-        throw const PortalFailure('注册信息未通过检查，请确认邮箱格式、密码长度和两次密码一致。');
+        throw const PortalFailure('注册信息未通过检查，请确认邮箱验证码有效、密码至少6位且两次输入一致。');
       }
       if (status == 401 || status == 403) {
         throw PortalFailure(path == '/api/login' ? '邮箱或密码错误。' : '登录已失效，请重新登录。', unauthorized: path != '/api/login');
@@ -185,11 +259,28 @@ class PortalApi {
     }
   }
 
-  Future<void> register(String email, String password, String confirmation) async {
+  Future<void> register(String email, String password, String confirmation, {String? code}) async {
     await _request(
       '/api/register',
-      body: {'email': email.trim(), 'password': password, 'confirm_password': confirmation},
+      body: {
+        'email': email.trim(),
+        'password': password,
+        'confirm_password': confirmation,
+        if (code != null) 'code': code,
+      },
     );
+  }
+
+  Future<void> sendRegistrationCode(String email) async {
+    await _request('/api/auth/send-code', body: {'email': email.trim()});
+  }
+
+  Future<String> syncOrder(String token, String orderNo) async {
+    if (!RegExp(r'^GBM[A-Z0-9]{20}$').hasMatch(orderNo)) {
+      throw const PortalFailure('订单号无效。');
+    }
+    final res = await _request('/api/order/$orderNo/sync-toyyibpay', token: token, body: {});
+    return res['status'] as String? ?? 'pending';
   }
 
   Future<String> login(String email, String password) async {
@@ -204,6 +295,16 @@ class PortalApi {
 
   Future<void> logout(String token) async {
     await _request('/api/logout', token: token, body: {});
+  }
+
+  Future<RechargeOrder> createOrder(String token) async {
+    final res = await _request('/api/order/create', token: token, body: {});
+    return RechargeOrder.fromJson(res);
+  }
+
+  Future<String> confirmOrder(String token, String orderNo) async {
+    final res = await _request('/api/order/$orderNo/confirm', token: token, body: {});
+    return res['message'] as String? ?? '已提交付款确认，等待核实';
   }
 
   void close() => _dio.close(force: true);

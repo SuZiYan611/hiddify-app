@@ -26,6 +26,38 @@ ResponseBody jsonResponse(Map<String, dynamic> value, [int status = 200]) => Res
 );
 
 void main() {
+  test('recharge accepts only official HTTPS bill URLs', () {
+    expect(RechargeOrder.fromJson({'payment_url': 'https://toyyibpay.com/abc123'}).paymentUrl?.host, 'toyyibpay.com');
+    for (final value in [
+      'http://toyyibpay.com/abc',
+      'https://evil.example/abc',
+      'https://toyyibpay.com.evil.example/abc',
+      'https://x@toyyibpay.com/abc',
+      'https://toyyibpay.com/abc?token=x',
+      'https://toyyibpay.com:444/abc',
+    ]) {
+      expect(() => RechargeOrder.fromJson({'payment_url': value}), throwsA(isA<PortalFailure>()));
+    }
+  });
+  test('email verification and order sync use expected authenticated routes', () async {
+    final requests = <RequestOptions>[];
+    final api = PortalApi(
+      'https://vpn.example.com',
+      adapter: FakeAdapter((request) {
+        requests.add(request);
+        return jsonResponse({'status': 'pending'});
+      }),
+    );
+    await api.sendRegistrationCode('test@example.com');
+    await api.register('test@example.com', 'Password123!', 'Password123!', code: '123456');
+    await api.syncOrder('session', 'GBM12345678901234567890');
+    expect(requests[0].path, '/api/auth/send-code');
+    expect(requests[0].headers.containsKey('Authorization'), false);
+    expect((requests[1].data as Map)['code'], '123456');
+    expect(requests[2].path, '/api/order/GBM12345678901234567890/sync-toyyibpay');
+    expect(requests[2].headers['Authorization'], 'Bearer session');
+    api.close();
+  });
   final origin = Uri.parse('https://vpn.example.com');
   test('rejects cleartext, credentials, path prefixes and URL metadata', () {
     for (final url in [
@@ -154,7 +186,9 @@ void main() {
     final data = <String, dynamic>{
       'email': 'test@example.com',
       'subscription': {'subscription_url': '${origin.origin}/sub/fixture_token'},
-      'nodes': [{'name': ' Malaysia ', 'longitude': 101.69, 'latitude': 3.14, 'uri': 'private-fixture-link'}],
+      'nodes': [
+        {'name': ' Malaysia ', 'longitude': 101.69, 'latitude': 3.14, 'uri': 'private-fixture-link'},
+      ],
     };
     final account = PortalAccount.fromJson(data, origin);
     expect(account.nodeNames, ['Malaysia']);
@@ -170,7 +204,9 @@ void main() {
     final account = PortalAccount.fromJson({
       'email': 'test@example.com',
       'subscription': {'subscription_url': '${origin.origin}/sub/fixture_token'},
-      'nodes': [{'name': '马来西亚 (AWS ap-southeast-5)'}],
+      'nodes': [
+        {'name': '马来西亚 (AWS ap-southeast-5)'},
+      ],
     }, origin);
     expect(account.nodes.single.longitude, 101.69);
     expect(account.nodes.single.latitude, 3.14);

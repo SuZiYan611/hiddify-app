@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hiddify/private_network/portal_api.dart';
 import 'package:hiddify/private_network/portal_session.dart';
 
@@ -26,6 +27,14 @@ class FakeGateway implements PortalGateway {
 }
 
 class FakeApi implements PortalApi {
+  @override
+  Future<RechargeOrder> createOrder(String token) async => throw UnimplementedError();
+  @override
+  Future<String> confirmOrder(String token, String orderNo) async => throw UnimplementedError();
+  @override
+  Future<void> sendRegistrationCode(String email) async => throw UnimplementedError();
+  @override
+  Future<String> syncOrder(String token, String orderNo) async => throw UnimplementedError();
   final calls = <String>[];
   bool expired = false;
   bool failLogout = false;
@@ -34,7 +43,7 @@ class FakeApi implements PortalApi {
   @override
   final origin = Uri.parse('https://vpn.example.com');
   @override
-  Future<void> register(String email, String password, String confirmation) async {
+  Future<void> register(String email, String password, String confirmation, {String? code}) async {
     calls.add('register');
   }
 
@@ -69,11 +78,13 @@ class FakeApi implements PortalApi {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late FakeGateway gateway;
   late FakeApi api;
   late PortalSession session;
   late List<String> saved;
   setUp(() {
+    FlutterSecureStorage.setMockInitialValues({});
     gateway = FakeGateway();
     api = FakeApi();
     saved = [];

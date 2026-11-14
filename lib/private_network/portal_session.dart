@@ -109,6 +109,7 @@ class PortalSession extends ChangeNotifier {
     required String email,
     required String password,
     String? confirmation,
+    String? verificationCode,
   }) async {
     if (busy || !ready || account != null) return;
     busy = true;
@@ -120,7 +121,7 @@ class PortalSession extends ChangeNotifier {
       _api = api;
       endpoint = api.origin.origin;
       await saveOrigin(endpoint);
-      if (confirmation != null) await api.register(email, password, confirmation);
+      if (confirmation != null) await api.register(email, password, confirmation, code: verificationCode);
       _token = await api.login(email, password);
       await secureStorage.write(key: 'gbm_session_token', value: _token);
       account = await api.me(_token!);
@@ -172,6 +173,50 @@ class PortalSession extends ChangeNotifier {
     } finally {
       busy = false;
       _changed();
+    }
+  }
+
+  Future<RechargeOrder?> createRechargeOrder() async {
+    if (_token == null || _api == null) return null;
+    try {
+      return await _api!.createOrder(_token!);
+    } catch (e) {
+      message = '生成充值订单失败: $e';
+      _changed();
+      return null;
+    }
+  }
+
+  Future<bool> confirmRechargeOrder(String orderNo) async {
+    if (_token == null || _api == null) return false;
+    try {
+      final msg = await _api!.confirmOrder(_token!, orderNo);
+      message = msg;
+      _changed();
+      return true;
+    } catch (e) {
+      message = '确认订单失败: $e';
+      _changed();
+      return false;
+    }
+  }
+
+  Future<String> syncRechargeOrder(String orderNo) async {
+    final token = _token;
+    final api = _api;
+    if (token == null || api == null) throw const PortalFailure('请先登录。');
+    final status = await api.syncOrder(token, orderNo);
+    if (_token != token || _api != api) throw const PortalFailure('登录状态已改变。');
+    if (status == 'paid') await refresh();
+    return status;
+  }
+
+  Future<void> sendRegistrationCode(String email) async {
+    final api = apiFactory(endpoint);
+    try {
+      await api.sendRegistrationCode(email);
+    } finally {
+      api.close();
     }
   }
 
