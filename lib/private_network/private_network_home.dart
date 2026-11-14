@@ -33,14 +33,7 @@ class PrivateNetworkHome extends ConsumerStatefulWidget {
 class _PrivateNetworkHomeState extends ConsumerState<PrivateNetworkHome> {
   final _pageController = PageController();
   final _verticalPageController = PageController();
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      GbmChinaBypassHelper.ensureDefaultEnabled(ref);
-    });
-  }
+  bool _routingDefaultsInitialized = false;
 
   @override
   void dispose() {
@@ -75,10 +68,22 @@ class _PrivateNetworkHomeState extends ConsumerState<PrivateNetworkHome> {
   Widget build(BuildContext context) {
     final session = ref.watch(portalSessionProvider);
     final account = session.account;
+    if (account == null) {
+      _routingDefaultsInitialized = false;
+      return const SizedBox.shrink();
+    }
+    if (!_routingDefaultsInitialized) {
+      _routingDefaultsInitialized = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && ref.read(portalSessionProvider).account != null) {
+          GbmChinaBypassHelper.ensureDefaultEnabled(ref);
+        }
+      });
+    }
     final connection = ref.watch(connectionNotifierProvider);
     final status = connection.valueOrNull;
     final active = ref.watch(activeProfileProvider).valueOrNull;
-    final ownProfile = active is RemoteProfileEntity && active.url == account?.subscription.toString();
+    final ownProfile = active is RemoteProfileEntity && active.url == account.subscription.toString();
     final proxy = ref.watch(activeProxyNotifierProvider).valueOrNull;
     final server = ref.watch(activeProxyCardProvider)?.server;
     final nodeName = server != null && !server.isGroup ? server.name : '正在识别节点';

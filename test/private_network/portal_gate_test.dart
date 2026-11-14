@@ -331,7 +331,10 @@ void main() {
             darkTheme: PrivateNetworkTheme.dark(),
             builder: (context, child) {
               child = PortalGate(child: child ?? const SizedBox());
-              return SnackBarHost(child: child);
+              return MediaQuery(
+                data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(2)),
+                child: SnackBarHost(child: child),
+              );
             },
           ),
         ),
@@ -343,6 +346,9 @@ void main() {
 
       // Verify sign in page is rendered in sub-Navigator with active overlay
       expect(find.byType(PortalSignInPage), findsOneWidget);
+      final signInContext = tester.element(find.byType(PortalSignInPage));
+      expect(Overlay.maybeOf(signInContext), isNotNull);
+      expect(MediaQuery.textScalerOf(signInContext).scale(10), 20);
       expect(find.text('GBM'), findsOneWidget);
       expect(find.text('你的私人网络'), findsOneWidget);
 

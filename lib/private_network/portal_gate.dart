@@ -32,10 +32,14 @@ class PortalGate extends ConsumerWidget {
         // The router's child is kept mounted so routerDelegate, navigatorKey,
         // and root Overlay remain valid throughout app lifecycle.
         FocusScope(
-          node: FocusScopeNode(canRequestFocus: isAuthenticated),
-          child: Offstage(
-            offstage: !isAuthenticated,
-            child: child,
+          canRequestFocus: isAuthenticated,
+          descendantsAreFocusable: isAuthenticated,
+          child: TickerMode(
+            enabled: isAuthenticated,
+            child: Offstage(
+              offstage: !isAuthenticated,
+              child: child,
+            ),
           ),
         ),
 
