@@ -35,13 +35,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh api "repos/$GITHUB_REPOSITORY" > /tmp/repository.json
-          python3 - <<'PY'
-          import json
-          with open('/tmp/repository.json') as file:
-              repo = json.load(file)
+          gh api "repos/$GITHUB_REPOSITORY" | python3 - <<'PY'
+          import json, sys
+          repo = json.load(sys.stdin)
           if repo.get('private') or not repo.get('fork') or repo.get('source', {}).get('full_name') != 'hiddify/hiddify-app':
               raise SystemExit('Build this client from your public fork of hiddify/hiddify-app.')
+          print('Fork verified:', repo.get('full_name'))
           PY
 
       - uses: subosito/flutter-action@v2
@@ -56,11 +55,28 @@ jobs:
           flutter pub get
           dart run build_runner build --delete-conflicting-outputs
           dart run slang
-          mkdir -p hiddify-core/bin
-          curl --fail --location --retry 3 --output "$RUNNER_TEMP/hiddify-windows.tar.gz" 'https://github.com/hiddify/hiddify-core/releases/download/draft/hiddify-lib-windows-amd64.tar.gz'
-          echo "3c8084a520797e99d2e44dd2e111af10c37539d24f37fada0345bd7f1721240a  $RUNNER_TEMP/hiddify-windows.tar.gz" | sha256sum --check --strict
-          tar -xzf "$RUNNER_TEMP/hiddify-windows.tar.gz" -C hiddify-core/bin
-          ls -la hiddify-core/bin
+          python3 - <<'PY'
+          import hashlib, os, tarfile, urllib.request
+
+          url = 'https://github.com/hiddify/hiddify-core/releases/download/draft/hiddify-lib-windows-amd64.tar.gz'
+          expected_sha = '3c8084a520797e99d2e44dd2e111af10c37539d24f37fada0345bd7f1721240a'
+          archive_path = 'hiddify-windows.tar.gz'
+          print('Downloading', url)
+          urllib.request.urlretrieve(url, archive_path)
+          with open(archive_path, 'rb') as f:
+              actual_sha = hashlib.sha256(f.read()).hexdigest()
+          if actual_sha != expected_sha:
+              raise SystemExit(f'SHA256 mismatch! Expected {expected_sha}, got {actual_sha}')
+          print('SHA256 verified:', actual_sha)
+
+          os.makedirs('hiddify-core/bin', exist_ok=True)
+          with tarfile.open(archive_path, 'r:gz') as tar:
+              tar.extractall('hiddify-core/bin')
+          os.unlink(archive_path)
+          print('Extracted to hiddify-core/bin:')
+          for f in os.listdir('hiddify-core/bin'):
+              print(' ', f)
+          PY
 
       - name: Analyze
         shell: bash
