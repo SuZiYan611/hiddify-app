@@ -1,19 +1,19 @@
 {
-  "body": "本次更新：注册邮箱验证码、ToyyibPay 官方订单付款页面与状态同步、长期订阅状态及未知流量展示修正。\n\nAndroid 内部测试版，使用与 test4 相同的 debug 签名，版本 5.5.7（50507）。真实付费入账尚未完成端到端实测。Windows 版本单独构建后追加。",
+  "body": "GBM test6: monochrome payment, home and sign-in redesign; order overflow and text contrast fixes; order-based package details; disable duplicate payment while activation is pending; defer home initialization until sign-in.\n\nAndroid 5.5.8 (50508), internal debug-signed test build. Same certificate as test4/test5 for in-place upgrade. 45 client tests passed; no analyze errors or warnings. Funded payment and VPN end-to-end were not verified in this UI acceptance. Windows is packaged separately.",
   "assets": [
     {
       "name": "GBM-Android-arm64-debug.apk",
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test5/GBM-Android-arm64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test6/GBM-Android-arm64-debug.apk",
       "state": "uploaded"
     },
     {
       "name": "GBM-Android-x86_64-debug.apk",
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test5/GBM-Android-x86_64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test6/GBM-Android-x86_64-debug.apk",
       "state": "uploaded"
     }
   ],
-  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test5",
+  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test6",
   "prerelease": true,
-  "tag_name": "private-network-v0.1.0-test5",
+  "tag_name": "private-network-v0.1.0-test6",
   "draft": false
 }
