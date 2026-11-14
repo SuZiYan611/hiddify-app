@@ -1,18 +1,18 @@
 {
-  "tag_name": "private-network-v0.1.0-test10",
-  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test10",
-  "body": "GBM test10 - Minimal three-page workspace\n\nLeft: app routing and direct-connection lists. Center: globe, real connection state, node selection and connect action. Right: account, usage, renewal, refresh and sign out.\n\nRemoved the vertical detail page, bottom navigation, the three home shortcuts, and the old connection slogan. Globe rotation and zoom keep ownership of their gestures; swipe outside the globe or use the top page labels to change pages.\n\nRemoved the long license introduction and unavailable source button. Component copyright/license texts remain accessible through a compact account-footer entry, with full notices on request. Repository visibility is separate from third-party license terms.\n\nRetains signed-out black-screen and private engine storage fixes. Version 5.5.12 (50512), release/AOT build with the existing signing certificate. 53 Flutter tests passed, including gestures, large text, light/dark login visibility and readable component notices. Three-page debug runtime screenshots and final APK cold-start checks are recorded locally. Physical phone, live payment and production VPN end-to-end checks are not claimed.\n\nARM64 is the phone build. Install over the current app; no data reset is needed. Legacy asset filenames remain for updater compatibility.\n",
+  "tag_name": "private-network-v0.1.0-test11",
+  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test11",
+  "body": "GBM test11 - Bottom workspace navigation\n\nMoved Routing / Connection / Account navigation to the bottom of the screen. Retains left routing, center connection and right account, swipe gestures and globe interaction.\n\nVersion 5.5.13 (50513). Release/AOT builds signed with the existing certificate. 53 tests passed, including bottom placement at 320px width with doubled text in light and dark themes. Existing startup and signed-out visibility fixes are retained.\n\nInstall the ARM64 phone package over your existing installation. Legacy asset names are retained for updater compatibility.\n",
   "prerelease": true,
   "draft": false,
   "assets": [
     {
       "name": "GBM-Android-arm64-debug.apk",
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test10/GBM-Android-arm64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test11/GBM-Android-arm64-debug.apk",
       "state": "uploaded"
     },
     {
       "name": "GBM-Android-x86_64-debug.apk",
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test10/GBM-Android-x86_64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test11/GBM-Android-x86_64-debug.apk",
       "state": "uploaded"
     }
   ]
