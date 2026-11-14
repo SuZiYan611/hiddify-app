@@ -1,19 +1,19 @@
 {
-  "body": "GBM test6: monochrome payment, home and sign-in redesign; order overflow and text contrast fixes; order-based package details; disable duplicate payment while activation is pending; defer home initialization until sign-in.\n\nAndroid 5.5.8 (50508), internal debug-signed test build. Same certificate as test4/test5 for in-place upgrade. 45 client tests passed; no analyze errors or warnings. Funded payment and VPN end-to-end were not verified in this UI acceptance. Windows is packaged separately.",
+  "tag_name": "private-network-v0.1.0-test7",
+  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test7",
+  "body": "GBM test7: monochrome sign-in, globe and payment UI; startup progress and safe retry; bounded engine handshake; compatible Android renderer.\n\nAndroid 5.5.9 (50509), release build signed with the existing Android Debug certificate for in-place upgrades. Asset filenames retain -debug.apk for updater compatibility. Windows is being packaged separately. Real funded payment and VPN end-to-end were not verified by this release acceptance.",
+  "prerelease": true,
+  "draft": false,
   "assets": [
     {
       "name": "GBM-Android-arm64-debug.apk",
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test6/GBM-Android-arm64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test7/GBM-Android-arm64-debug.apk",
       "state": "uploaded"
     },
     {
       "name": "GBM-Android-x86_64-debug.apk",
-      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test6/GBM-Android-x86_64-debug.apk",
+      "browser_download_url": "https://github.com/SuZiYan611/hiddify-app/releases/download/private-network-v0.1.0-test7/GBM-Android-x86_64-debug.apk",
       "state": "uploaded"
     }
-  ],
-  "html_url": "https://github.com/SuZiYan611/hiddify-app/releases/tag/private-network-v0.1.0-test6",
-  "prerelease": true,
-  "tag_name": "private-network-v0.1.0-test6",
-  "draft": false
+  ]
 }
