@@ -35,12 +35,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh api "repos/$GITHUB_REPOSITORY" | python3 - <<'PY'
-          import json, sys
-          repo = json.load(sys.stdin)
+          python3 - <<'PY'
+          import json, os, urllib.request
+
+          repo_name = os.environ['GITHUB_REPOSITORY']
+          token = os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')
+          headers = {'User-Agent': 'Actions'}
+          if token:
+              headers['Authorization'] = f'Bearer {token}'
+          req = urllib.request.Request(f'https://api.github.com/repos/{repo_name}', headers=headers)
+          with urllib.request.urlopen(req) as resp:
+              repo = json.loads(resp.read().decode())
           if repo.get('private') or not repo.get('fork') or repo.get('source', {}).get('full_name') != 'hiddify/hiddify-app':
               raise SystemExit('Build this client from your public fork of hiddify/hiddify-app.')
-          print('Fork verified:', repo.get('full_name'))
+          print('Fork verified:', repo.get('full_name'), '->', repo.get('source', {}).get('full_name'))
           PY
 
       - uses: subosito/flutter-action@v2
