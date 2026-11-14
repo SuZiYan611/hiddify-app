@@ -1,14 +1,75 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const _currentTag = String.fromEnvironment('GBM_RELEASE_TAG', defaultValue: 'private-network-v0.1.0-test5');
 const _preference = 'gbm_auto_check_updates';
+
+/// Returns update manifest URL for the active or specified platform.
+String gbmUpdateManifestUrl({bool? isWindows}) {
+  final windows = isWindows ?? Platform.isWindows;
+  final filename = windows ? 'windows.json' : 'android.json';
+  return 'https://raw.githubusercontent.com/SuZiYan611/hiddify-app/private-network/updates/$filename';
+}
+
+/// Parses private-network semantic tag (e.g. private-network-v0.1.0-test5).
+List<int>? parseGbmVersion(String tag) {
+  final match = RegExp(r'^private-network-v(\d+)\.(\d+)\.(\d+)(?:-test(\d+))?$').firstMatch(tag);
+  if (match == null) return null;
+  return [for (var i = 1; i <= 3; i++) int.parse(match.group(i)!), int.tryParse(match.group(4) ?? '') ?? 1000000];
+}
+
+/// Compares two private-network tags.
+int compareGbmTags(String a, String b) {
+  final av = parseGbmVersion(a);
+  final bv = parseGbmVersion(b);
+  if (av == null || bv == null) return a.compareTo(b);
+  for (var i = 0; i < av.length; i++) {
+    if (av[i] != bv[i]) return av[i].compareTo(bv[i]);
+  }
+  return 0;
+}
+
+/// Selects download asset URL for Windows or Android platform.
+String? selectGbmDownloadUrl(
+  Map<String, dynamic> release, {
+  bool? isWindows,
+  bool? isAndroid,
+  List<String>? androidAbis,
+}) {
+  final windows = isWindows ?? Platform.isWindows;
+  final android = isAndroid ?? Platform.isAndroid;
+  final assets = (release['assets'] as List<dynamic>? ?? []).whereType<Map<String, dynamic>>();
+
+  if (windows) {
+    for (final asset in assets) {
+      if (asset['name'] == 'GBM-Windows-x64.zip' && asset['state'] == 'uploaded') {
+        return asset['browser_download_url'] as String?;
+      }
+    }
+    return null;
+  }
+
+  if (android) {
+    final abis = androidAbis ?? const <String>[];
+    final names = <String>[
+      if (abis.contains('arm64-v8a')) 'GBM-Android-arm64-debug.apk',
+      if (abis.contains('x86_64')) 'GBM-Android-x86_64-debug.apk',
+    ];
+    for (final asset in assets) {
+      if (names.contains(asset['name']) && asset['state'] == 'uploaded') {
+        return asset['browser_download_url'] as String?;
+      }
+    }
+  }
+
+  return null;
+}
 
 /// Settings and the startup watcher use the same persisted preference.
 class GbmUpdateSettings extends StatefulWidget {
@@ -40,68 +101,51 @@ class _GbmUpdateSettingsState extends State<GbmUpdateSettings> {
     }
   }
 
-  List<int>? _version(String tag) {
-    final match = RegExp(r'^private-network-v(\d+)\.(\d+)\.(\d+)(?:-test(\d+))?$').firstMatch(tag);
-    if (match == null) return null;
-    return [for (var i = 1; i <= 3; i++) int.parse(match.group(i)!), int.tryParse(match.group(4) ?? '') ?? 1000000];
-  }
-
-  int _compare(String a, String b) {
-    final av = _version(a)!;
-    final bv = _version(b)!;
-    for (var i = 0; i < av.length; i++) {
-      if (av[i] != bv[i]) return av[i].compareTo(bv[i]);
-    }
-    return 0;
-  }
-
   Future<void> _check({bool automatic = false}) async {
     if (_busy) return;
     setState(() => _busy = true);
+    final isWin = Platform.isWindows;
     final client = Dio(
       BaseOptions(
         connectTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 20),
-        headers: {'Accept': 'application/vnd.github+json', 'User-Agent': 'GBM-Android-UpdateChecker'},
+        headers: {
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': isWin ? 'GBM-Windows-UpdateChecker' : 'GBM-Android-UpdateChecker',
+        },
       ),
     );
     try {
-      final response = await client.get<String>(
-        'https://raw.githubusercontent.com/SuZiYan611/hiddify-app/private-network/updates/android.json',
-      );
+      final manifestUrl = gbmUpdateManifestUrl();
+      final response = await client.get<String>(manifestUrl);
       final releases =
           [if (response.data != null) jsonDecode(response.data!.replaceFirst('\uFEFF', ''))]
               .whereType<Map<String, dynamic>>()
               .where(
                 (r) =>
                     r['draft'] != true &&
-                    _version(r['tag_name'] as String? ?? '') != null &&
+                    parseGbmVersion(r['tag_name'] as String? ?? '') != null &&
                     (_currentTag.contains('-test') || r['prerelease'] != true),
               )
               .toList()
-            ..sort((a, b) => _compare(b['tag_name'] as String, a['tag_name'] as String));
+            ..sort((a, b) => compareGbmTags(b['tag_name'] as String, a['tag_name'] as String));
       if (releases.isEmpty) throw const FormatException('No GBM releases');
       final latest = releases.first;
       final tag = latest['tag_name'] as String;
       if (!mounted) return;
-      if (_compare(tag, _currentTag) <= 0) {
+      if (compareGbmTags(tag, _currentTag) <= 0) {
         setState(() => _message = '已是最新版本 · $_currentTag');
         if (!automatic) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已是最新版本')));
         return;
       }
       String? download;
-      if (Platform.isAndroid) {
+      if (Platform.isWindows) {
+        download = selectGbmDownloadUrl(latest, isWindows: true);
+      } else if (Platform.isAndroid) {
         final abis =
             await const MethodChannel('com.hiddify.app/platform').invokeListMethod<String>('supported_abis') ??
             const <String>[];
-        final names = <String>[
-          if (abis.contains('arm64-v8a')) 'GBM-Android-arm64-debug.apk',
-          if (abis.contains('x86_64')) 'GBM-Android-x86_64-debug.apk',
-        ];
-        for (final asset in (latest['assets'] as List<dynamic>? ?? []).whereType<Map<String, dynamic>>()) {
-          if (names.contains(asset['name']) && asset['state'] == 'uploaded')
-            download = asset['browser_download_url'] as String?;
-        }
+        download = selectGbmDownloadUrl(latest, isAndroid: true, androidAbis: abis);
       }
       final target = Uri.parse(download ?? latest['html_url'] as String);
       if (target.scheme != 'https' ||
@@ -126,8 +170,9 @@ class _GbmUpdateSettingsState extends State<GbmUpdateSettings> {
           ],
         ),
       );
-      if (accept == true && !await launchUrl(target, mode: LaunchMode.externalApplication))
+      if (accept == true && !await launchUrl(target, mode: LaunchMode.externalApplication)) {
         throw StateError('Cannot open download');
+      }
     } catch (error) {
       final reason = error is DioException
           ? switch (error.response?.statusCode) {

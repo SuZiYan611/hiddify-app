@@ -1,0 +1,180 @@
+name: Private Network Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['private-network']
+    paths:
+      - 'lib/**'
+      - 'test/private_network/**'
+      - 'windows/**'
+      - 'pubspec*'
+      - '.github/workflows/private-network-windows.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      IS_GITHUB_ACTIONS: '1'
+      PORTAL_ORIGIN: ${{ vars.PORTAL_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify this is a public Hiddify fork
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY" > /tmp/repository.json
+          python3 - <<'PY'
+          import json
+          with open('/tmp/repository.json') as file:
+              repo = json.load(file)
+          if repo.get('private') or not repo.get('fork') or repo.get('source', {}).get('full_name') != 'hiddify/hiddify-app':
+              raise SystemExit('Build this client from your public fork of hiddify/hiddify-app.')
+          PY
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.5'
+          channel: stable
+          cache: true
+
+      - name: Prepare pinned upstream dependencies and generated code
+        shell: bash
+        run: |
+          flutter pub get
+          dart run build_runner build --delete-conflicting-outputs
+          dart run slang
+          mkdir -p hiddify-core/bin
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/hiddify-windows.tar.gz" 'https://github.com/hiddify/hiddify-core/releases/download/draft/hiddify-lib-windows-amd64.tar.gz'
+          echo "3c8084a520797e99d2e44dd2e111af10c37539d24f37fada0345bd7f1721240a  $RUNNER_TEMP/hiddify-windows.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/hiddify-windows.tar.gz" -C hiddify-core/bin
+          ls -la hiddify-core/bin
+
+      - name: Analyze
+        shell: bash
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Test client API and account lifecycle
+        shell: bash
+        run: flutter test test/private_network
+
+      - name: Write build-time public configuration
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from urllib.parse import urlsplit
+          origin = os.environ.get('PORTAL_ORIGIN', '').strip() or 'https://api.gobackmsia.work'
+          if origin:
+              url = urlsplit(origin)
+              if url.scheme != 'https' or not url.hostname or url.username or url.password or url.path not in ('', '/') or url.query or url.fragment:
+                  raise SystemExit('PORTAL_BASE_URL must be an HTTPS origin without credentials or path.')
+          config = {
+              'PORTAL_BASE_URL': origin,
+              'CLIENT_SOURCE_URL': 'https://github.com/' + os.environ['GITHUB_REPOSITORY'] + '/tree/' + os.environ['GITHUB_SHA'],
+              'GBM_RELEASE_TAG': 'private-network-v0.1.0-test5',
+              'portable': 'true',
+          }
+          with open('private-network-build.json', 'w') as file:
+              json.dump(config, file, indent=2)
+          print('Wrote private-network-build.json:', config)
+          PY
+
+      - name: Build Windows release
+        shell: bash
+        run: |
+          flutter build windows --release --target lib/main_prod.dart --dart-define-from-file=private-network-build.json --dart-define=portable=true
+
+      - name: Verify release tree and package zip
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, struct, hashlib, zipfile, sys
+
+          release_dir = os.path.join('build', 'windows', 'x64', 'runner', 'Release')
+          if not os.path.isdir(release_dir):
+              sys.exit(f'Release dir not found: {release_dir}')
+
+          def verify_pe_x64(path):
+              if not os.path.isfile(path):
+                  sys.exit(f'Missing required binary: {path}')
+              with open(path, 'rb') as f:
+                  data = f.read(1024)
+              if data[:2] != b'MZ':
+                  sys.exit(f'{path} does not have MZ header')
+              pe_offset = struct.unpack('<I', data[0x3c:0x40])[0]
+              with open(path, 'rb') as f:
+                  f.seek(pe_offset)
+                  pe_sig = f.read(4)
+                  if pe_sig != b'PE\x00\x00':
+                      sys.exit(f'{path} does not have PE signature')
+                  machine = struct.unpack('<H', f.read(2))[0]
+                  if machine != 0x8664:
+                      sys.exit(f'{path} is not x64 (machine={hex(machine)})')
+              print(f'Verified PE x64: {path} (size={os.path.getsize(path)})')
+
+          required_binaries = [
+              'Hiddify.exe',
+              'flutter_windows.dll',
+              'hiddify-core.dll',
+              'libcronet.dll',
+              'HiddifyCli.exe',
+              'HiddifyAdmin.exe',
+          ]
+          for b in required_binaries:
+              verify_pe_x64(os.path.join(release_dir, b))
+
+          data_dir = os.path.join(release_dir, 'data')
+          if not os.path.isdir(data_dir):
+              sys.exit('Missing data directory')
+          required_data = [
+              os.path.join(data_dir, 'icudtl.bin'),
+              os.path.join(data_dir, 'app.so'),
+              os.path.join(data_dir, 'flutter_assets'),
+          ]
+          for d in required_data:
+              if not os.path.exists(d):
+                  sys.exit(f'Missing required data: {d}')
+              print(f'Verified data path: {d}')
+
+          os.makedirs('dist', exist_ok=True)
+          zip_name = 'GBM-Windows-x64.zip'
+          zip_path = os.path.join('dist', zip_name)
+          with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+              for root, dirs, files in os.walk(release_dir):
+                  for f in files:
+                      full = os.path.join(root, f)
+                      rel = os.path.relpath(full, release_dir)
+                      zf.write(full, rel)
+          size = os.path.getsize(zip_path)
+          with open(zip_path, 'rb') as f:
+              h = hashlib.sha256(f.read()).hexdigest()
+          print(f'Created {zip_name}: size={size}, sha256={h}')
+
+          sums_path = os.path.join('dist', 'SHA256SUMS.txt')
+          with open(sums_path, 'w', encoding='utf-8') as f:
+              f.write(f'{h}  {zip_name}\n')
+          print('Created dist/SHA256SUMS.txt')
+          PY
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GBM-Windows-x64
+          path: |
+            dist/GBM-Windows-x64.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7
