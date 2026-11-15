@@ -1,0 +1,8 @@
+{
+  "package": "work.gbm.client",
+  "version": "0.1.4-preview4",
+  "assets": {
+    "arm64-v8a": "https://github.com/SuZiYan611/hiddify-app/releases/download/gbm-independent-v0.1.4-preview4/GBM-Independent-Android-arm64-debug.apk",
+    "x86_64": "https://github.com/SuZiYan611/hiddify-app/releases/download/gbm-independent-v0.1.4-preview4/GBM-Independent-Android-x86_64-debug.apk"
+  }
+}
