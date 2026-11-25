@@ -1,10 +1,10 @@
 {
   "package": "work.gbm.client.windows",
-  "version": "0.1.18-preview18",
+  "version": "0.1.19-preview19",
   "assets": {
-    "x64": "https://github.com/SuZiYan611/hiddify-app/releases/download/gbm-windows-v0.1.18-preview18/GBM-Windows-x64-Setup.exe"
+    "x64": "https://github.com/SuZiYan611/hiddify-app/releases/download/gbm-windows-v0.1.19-preview19/GBM-Windows-x64-Setup.exe"
   },
   "sha256": {
-    "x64": "1063177059ae6ab6aecc8e28f239a49ad95dea4ed53cb08d7198c52fb0f055f9"
+    "x64": "5713acb926715c3c656f94a87740c275163dcf4d3dfad64e54a159d4644bd1de"
   }
 }
